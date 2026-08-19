@@ -54,6 +54,9 @@ addopts = "-q"
 line-length = 100
 src = ["src", "tests"]
 target-version = "py311"
+# Ruff must never rewrite Markdown. SPECIFICATION.md is FROZEN, and newer ruff
+# versions format Python code blocks inside Markdown files by default.
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "C4", "SIM", "RUF"]

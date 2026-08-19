@@ -85,9 +85,13 @@ jobs:
           set -uo pipefail
           cd /tmp/smoke
           EWL=/tmp/cleanenv/bin/eo-workflow-lint
+          # GitHub runs each step with `bash -e`. A non-zero exit is an expected
+          # outcome here, so the status is captured via `|| got=$?`, which keeps
+          # the command in a condition context and does not trip errexit.
           expect() {  # expect <code> <label> <command...>
             local want="$1" label="$2"; shift 2
-            "$@" >/dev/null 2>&1; local got=$?
+            local got=0
+            "$@" >/dev/null 2>&1 || got=$?
             if [ "$got" != "$want" ]; then
               echo "FAIL: $label expected exit $want, got $got"; exit 1
             fi
@@ -110,8 +114,8 @@ jobs:
           # The fixture legitimately exits 1 (it has a FAIL finding); anything
           # else is a real error and must not be swallowed.
           emit() {
-            $EWL check "$1" --format json > "$2"
-            local code=$?
+            local code=0
+            $EWL check "$1" --format json > "$2" || code=$?
             if [ "$code" != "1" ]; then
               echo "FAIL: expected exit 1 from $1, got $code"; exit 1
             fi
@@ -167,14 +171,14 @@ jobs:
         run: |
           set -uo pipefail
           if unshare -rn true 2>/dev/null; then
-            unshare -rn eo-workflow-lint check examples/clean_workflow.py
-            got=$?
+            got=0
+            unshare -rn eo-workflow-lint check examples/clean_workflow.py || got=$?
             if [ "$got" != "0" ]; then
               echo "FAIL: expected exit 0 with no network namespace, got $got"; exit 1
             fi
             echo "PASS fixture exited 0 with no network namespace"
-            unshare -rn eo-workflow-lint check examples/sentinel2_qa60_gap.py --format json
-            got=$?
+            got=0
+            unshare -rn eo-workflow-lint check examples/sentinel2_qa60_gap.py --format json || got=$?
             if [ "$got" != "1" ]; then
               echo "FAIL: expected exit 1 with no network namespace, got $got"; exit 1
             fi
