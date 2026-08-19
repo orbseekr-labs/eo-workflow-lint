@@ -32,7 +32,9 @@ jobs:
       - name: Ruff format check
         run: ruff format --check .
       - name: Test suite
-        run: pytest -q
+        # pyproject already sets `-q`; passing it again would suppress the
+        # pass/fail summary line that the release gate is evidenced by.
+        run: pytest
       - name: Runtime dependency audit
         run: |
           python - <<'PY'
