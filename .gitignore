@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+tests/fixtures/SIDE_EFFECT_MARKER
+
+# macOS / editor metadata
+.DS_Store
+.idea/
+.vscode/

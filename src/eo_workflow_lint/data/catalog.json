@@ -1,0 +1,126 @@
+{
+  "catalog_version": "2026-08-19.1",
+  "sources": [
+    {
+      "id": "SRC-GEE-LANDSAT-C1-C2",
+      "title": "Google Earth Engine — Landsat Collection 1 to Collection 2 migration",
+      "url": "https://developers.google.com/earth-engine/landsat_c1_to_c2",
+      "facts": [
+        "Collection 2 Level-2 reflectance uses the new scale and additive offset.",
+        "Collection 2 thermal bands use a distinct scale and additive offset.",
+        "Google provides an explicit example that scales SR and ST separately."
+      ]
+    },
+    {
+      "id": "SRC-GEE-NORMALIZED-DIFFERENCE",
+      "title": "Google Earth Engine — ee.Image.normalizedDifference",
+      "url": "https://developers.google.com/earth-engine/apidocs/ee-image-normalizeddifference",
+      "facts": [
+        "If either input band has a negative pixel value, the output pixel from normalizedDifference() is masked.",
+        "Google recommends ee.Image.expression() when negative values must not be masked."
+      ]
+    },
+    {
+      "id": "SRC-GEE-REDUCE-REGION",
+      "title": "Google Earth Engine — ee.Image.reduceRegion",
+      "url": "https://developers.google.com/earth-engine/apidocs/ee-image-reduceregion",
+      "facts": [
+        "Google states it is good practice to explicitly define analysis scale (or crsTransform) and crs to avoid unexpected results from undesired defaults."
+      ]
+    },
+    {
+      "id": "SRC-GEE-REDUCE-REGIONS",
+      "title": "Google Earth Engine — ee.Image.reduceRegions",
+      "url": "https://developers.google.com/earth-engine/apidocs/ee-image-reduceregions",
+      "facts": [
+        "The API supports explicit scale, crs, and crsTransform for region analysis."
+      ]
+    },
+    {
+      "id": "SRC-GEE-S1-GRD",
+      "title": "Google Earth Engine Data Catalog — COPERNICUS/S1_GRD",
+      "url": "https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S1_GRD",
+      "facts": [
+        "COPERNICUS/S1_GRD is provided in decibels after log scaling.",
+        "Raw power values are exposed separately through COPERNICUS/S1_GRD_FLOAT."
+      ]
+    },
+    {
+      "id": "SRC-GEE-S2-HARMONIZED",
+      "title": "Google Earth Engine Data Catalog — Harmonized Sentinel-2 MSI Level-1C",
+      "url": "https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S2_HARMONIZED",
+      "facts": [
+        "QA60 historically contained rasterized cloud polygons.",
+        "Those polygons stopped being produced in 2022.",
+        "Legacy-consistent QA60 bands are constructed again from MSK_CLASSI beginning in February 2024."
+      ]
+    },
+    {
+      "id": "SRC-GEE-S2-SR-HARMONIZED",
+      "title": "Google Earth Engine Data Catalog — Harmonized Sentinel-2 MSI Level-2A",
+      "url": "https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S2_SR_HARMONIZED",
+      "facts": [
+        "The QA60 discontinuity applies to the Level-2A harmonized collection.",
+        "v0.1.0 uses the conservative interior interval beginning 2022-01-26 and ending before 2024-02-28; the boundary dates themselves are intentionally not linted in v0.1.0 to avoid false positives from documentation-boundary ambiguity."
+      ]
+    },
+    {
+      "id": "SRC-USGS-LANDSAT-C2-SCALE",
+      "title": "USGS — How do I use a scale factor with Landsat Level-2 science products?",
+      "url": "https://www.usgs.gov/faqs/how-do-i-use-a-scale-factor-landsat-level-2-science-products",
+      "facts": [
+        "Collection 2 Surface Reflectance scale factor: 0.0000275",
+        "Collection 2 Surface Reflectance additive offset: -0.2",
+        "Collection 2 Surface Temperature scale factor: 0.00341802",
+        "Collection 2 Surface Temperature additive offset: 149.0"
+      ]
+    }
+  ],
+  "landsat_c2_l2": {
+    "collections": {
+      "LANDSAT/LC08/C02/T1_L2": "LC08",
+      "LANDSAT/LC08/C02/T2_L2": "LC08",
+      "LANDSAT/LC09/C02/T1_L2": "LC09",
+      "LANDSAT/LC09/C02/T2_L2": "LC09",
+      "LANDSAT/LE07/C02/T1_L2": "LE07",
+      "LANDSAT/LE07/C02/T2_L2": "LE07",
+      "LANDSAT/LT04/C02/T1_L2": "LT04",
+      "LANDSAT/LT04/C02/T2_L2": "LT04",
+      "LANDSAT/LT05/C02/T1_L2": "LT05",
+      "LANDSAT/LT05/C02/T2_L2": "LT05"
+    },
+    "surface_temperature_band": {
+      "LC08": "ST_B10",
+      "LC09": "ST_B10",
+      "LE07": "ST_B6",
+      "LT04": "ST_B6",
+      "LT05": "ST_B6"
+    },
+    "surface_reflectance_regex_selector": "SR_B.",
+    "surface_reflectance_scale": 0.0000275,
+    "surface_reflectance_offset": -0.2,
+    "surface_temperature_scale": 0.00341802,
+    "surface_temperature_offset": 149.0,
+    "source_ids": ["SRC-GEE-LANDSAT-C1-C2", "SRC-USGS-LANDSAT-C2-SCALE"]
+  },
+  "sentinel1": {
+    "domains": {
+      "COPERNICUS/S1_GRD": "DB",
+      "COPERNICUS/S1_GRD_FLOAT": "LINEAR_POWER"
+    },
+    "backscatter_bands": ["HH", "HV", "VH", "VV"],
+    "source_ids": ["SRC-GEE-S1-GRD"]
+  },
+  "sentinel2": {
+    "collections": [
+      "COPERNICUS/S2",
+      "COPERNICUS/S2_HARMONIZED",
+      "COPERNICUS/S2_SR",
+      "COPERNICUS/S2_SR_HARMONIZED"
+    ],
+    "qa60_band": "QA60",
+    "qa60_gap_start": "2022-01-26",
+    "qa60_gap_end": "2024-02-28",
+    "source_ids": ["SRC-GEE-S2-HARMONIZED", "SRC-GEE-S2-SR-HARMONIZED"]
+  }
+}

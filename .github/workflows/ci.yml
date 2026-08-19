@@ -1,0 +1,185 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# No secrets are used by any job; every step runs offline apart from installing
+# the development tooling itself.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+      - name: Ruff check
+        run: ruff check .
+      - name: Ruff format check
+        run: ruff format --check .
+      - name: Test suite
+        run: pytest -q
+      - name: Runtime dependency audit
+        run: |
+          python - <<'PY'
+          from importlib.metadata import requires
+          declared = requires("eo-workflow-lint") or []
+          unconditional = [r for r in declared if 'extra ==' not in r]
+          assert unconditional == [], f"unexpected runtime dependencies: {unconditional}"
+          print("runtime dependencies: none")
+          PY
+
+  clean-install:
+    name: Clean install + CLI smoke + exit codes
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Build wheel and sdist
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel --sdist --outdir dist
+      - name: Install the built wheel into a clean environment
+        run: |
+          python -m venv /tmp/cleanenv
+          /tmp/cleanenv/bin/python -m pip install --upgrade pip
+          /tmp/cleanenv/bin/python -m pip install dist/*.whl
+          /tmp/cleanenv/bin/python -m pip list --format=freeze
+      - name: CLI smoke test from outside the checkout
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/smoke && cp examples/*.py /tmp/smoke/
+          cd /tmp/smoke
+          # Prove imports resolve from the installed wheel, not the working tree.
+          /tmp/cleanenv/bin/python -c "import eo_workflow_lint, sys; \
+            assert 'site-packages' in eo_workflow_lint.__file__, eo_workflow_lint.__file__; \
+            print('resolved from', eo_workflow_lint.__file__)"
+          EWL=/tmp/cleanenv/bin/eo-workflow-lint
+          $EWL --version
+          $EWL rules
+          $EWL sources
+          $EWL explain EWL301
+          $EWL check clean_workflow.py
+      - name: Exit-code contract
+        run: |
+          set -uo pipefail
+          cd /tmp/smoke
+          EWL=/tmp/cleanenv/bin/eo-workflow-lint
+          expect() {  # expect <code> <label> <command...>
+            local want="$1" label="$2"; shift 2
+            "$@" >/dev/null 2>&1; local got=$?
+            if [ "$got" != "$want" ]; then
+              echo "FAIL: $label expected exit $want, got $got"; exit 1
+            fi
+            echo "ok: $label -> $got"
+          }
+          expect 0 "PASS"                    $EWL check clean_workflow.py
+          expect 0 "CONDITIONAL default"     $EWL check reduce_region_no_scale.py
+          expect 1 "CONDITIONAL threshold"   $EWL check reduce_region_no_scale.py --fail-on conditional
+          expect 1 "FAIL"                    $EWL check landsat_ndvi_unscaled.py
+          expect 1 "FAIL json"               $EWL check sentinel2_qa60_gap.py --format json
+          expect 2 "missing file"            $EWL check does_not_exist.py
+          expect 2 "unknown reason code"     $EWL explain EWL999
+          printf 'def broken(:\n' > broken.py
+          expect 2 "syntax error"            $EWL check broken.py
+      - name: Determinism
+        run: |
+          set -uo pipefail
+          cd /tmp/smoke
+          EWL=/tmp/cleanenv/bin/eo-workflow-lint
+          # The fixture legitimately exits 1 (it has a FAIL finding); anything
+          # else is a real error and must not be swallowed.
+          emit() {
+            $EWL check "$1" --format json > "$2"
+            local code=$?
+            if [ "$code" != "1" ]; then
+              echo "FAIL: expected exit 1 from $1, got $code"; exit 1
+            fi
+          }
+          emit sentinel2_qa60_gap.py a.json
+          for i in $(seq 1 10); do
+            emit sentinel2_qa60_gap.py b.json
+            cmp a.json b.json || exit 1
+          done
+          mkdir -p /tmp/other/dir && cp sentinel2_qa60_gap.py /tmp/other/dir/renamed.py
+          (cd /tmp/other/dir && emit renamed.py /tmp/smoke/c.json)
+          cmp a.json c.json || exit 1
+          echo "deterministic across runs, directories and filenames"
+
+  offline:
+    name: Network-disabled runtime check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+      - name: Check runs with sockets unavailable
+        # Primary, always-enforced proof: every socket primitive raises.
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import socket, sys
+
+          def blocked(*a, **k):
+              raise AssertionError("network access attempted")
+
+          for name in ("socket", "socketpair", "create_connection", "create_server",
+                       "getaddrinfo", "gethostbyname", "gethostname"):
+              if hasattr(socket, name):
+                  setattr(socket, name, blocked)
+
+          from eo_workflow_lint.cli import main
+          assert main(["check", "examples/clean_workflow.py"]) == 0
+          assert main(["check", "examples/landsat_ndvi_unscaled.py", "--format", "json"]) == 1
+          assert main(["rules"]) == 0
+          assert main(["sources"]) == 0
+          assert main(["explain", "EWL301"]) == 0
+          print("all commands succeeded with networking disabled")
+          PY
+      - name: Check runs in an empty network namespace
+        # Secondary proof. Unprivileged user namespaces are unavailable on some
+        # runner images; skip explicitly rather than masking a real failure.
+        run: |
+          set -uo pipefail
+          if unshare -rn true 2>/dev/null; then
+            unshare -rn eo-workflow-lint check examples/clean_workflow.py
+            got=$?
+            if [ "$got" != "0" ]; then
+              echo "FAIL: expected exit 0 with no network namespace, got $got"; exit 1
+            fi
+            echo "PASS fixture exited 0 with no network namespace"
+            unshare -rn eo-workflow-lint check examples/sentinel2_qa60_gap.py --format json
+            got=$?
+            if [ "$got" != "1" ]; then
+              echo "FAIL: expected exit 1 with no network namespace, got $got"; exit 1
+            fi
+            echo "FAIL fixture exited 1 with no network namespace"
+          else
+            echo "unprivileged user namespaces unavailable on this runner; \
+            skipped (the socket-blocked step above is the enforced proof)"
+          fi
