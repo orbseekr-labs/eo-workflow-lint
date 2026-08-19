@@ -32,15 +32,24 @@ into a scientific verdict — there is no `UNKNOWN` verdict.
 
 ## Install
 
+Python 3.11 or newer. `eo-workflow-lint` has no runtime dependencies.
+
+**Install the released version directly from GitHub:**
+
 ```bash
-pip install eo-workflow-lint
+pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.1.0"
 ```
 
-From a local checkout:
+**Or install from a local clone**, which you will want if you intend to run the tests or read the
+specification alongside the code:
 
 ```bash
+git clone https://github.com/orbseekr-labs/eo-workflow-lint.git
+cd eo-workflow-lint
 pip install .
 ```
+
+Either method installs the `eo-workflow-lint` command. The package is not published on PyPI.
 
 ## Usage
 
@@ -131,7 +140,7 @@ threshold; they are counted in `suppressed_finding_count`.
 ```yaml
 - name: Lint Earth Engine workflows
   run: |
-    pip install eo-workflow-lint
+    pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.1.0"
     for f in $(git ls-files '*.py'); do
       eo-workflow-lint check "$f" --fail-on conditional
     done
