@@ -118,7 +118,16 @@ def _run_explain(code: str, stdout) -> int:
     stdout.write("\ndoes not trigger when:\n")
     for item in meta.non_triggers:
         stdout.write(f"  - {item}\n")
-    stdout.write(f"\nmessage:\n  {meta.message}\n\nsources:\n")
+    stdout.write(f"\nmessage:\n  {meta.message}\n")
+    if meta.remediation:
+        stdout.write("\nremediation:\n")
+        for item in meta.remediation:
+            stdout.write(f"  - {item}\n")
+        if meta.remediation_example:
+            stdout.write("\n  example (illustrative, not a required form):\n\n")
+            for example_line in meta.remediation_example.splitlines():
+                stdout.write(f"    {example_line}".rstrip() + "\n")
+    stdout.write("\nsources:\n")
     for source_id in sorted(meta.source_ids):
         source = catalog.source_by_id(source_id)
         if source is None:  # pragma: no cover - registry is frozen and complete

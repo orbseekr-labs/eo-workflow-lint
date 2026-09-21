@@ -5,8 +5,13 @@ from __future__ import annotations
 import json
 
 from .models import Report, Verdict
+from .rules import rule_meta
 
-__all__ = ["PASS_LIMITATION", "to_json", "to_text"]
+__all__ = ["MAX_HINT_LINES", "PASS_LIMITATION", "to_json", "to_text"]
+
+#: Upper bound on ``hint:`` lines rendered per finding in text output. The full
+#: remediation, including any example, is available through ``explain <CODE>``.
+MAX_HINT_LINES = 3
 
 PASS_LIMITATION = (
     "note: PASS means no supported v0.1.0 rule produced a finding in the statically "
@@ -49,6 +54,11 @@ def to_text(report: Report, path: str | None = None) -> str:
         lines.append(f"{finding.code} {finding.name}")
         lines.append(f"line {finding.line}: {finding.message}")
         lines.append(f"source: {', '.join(finding.source_ids)}")
+        # Rules without remediation guidance render exactly as before.
+        meta = rule_meta(finding.code)
+        if meta is not None:
+            for hint in meta.remediation[:MAX_HINT_LINES]:
+                lines.append(f"hint: {hint}")
 
     fails, conditionals = report.counts()
     coverage = report.coverage

@@ -1,13 +1,25 @@
-# eo-workflow-lint Specification v0.1.0
+# eo-workflow-lint Specification v0.1.1
 
 **Status:** FROZEN  
-**Specification version:** 0.1.0  
+**Specification version:** 0.1.1  
 **Freeze date:** 2026-08-19 (JST)  
+**Last authorised revision:** 2026-09-22 (JST), see Revision history  
 **Project:** OrbSeekr Labs Project #002  
 **License target:** Apache-2.0  
 **Implementation target:** Python 3.11+
 
 > A deterministic, offline static analyzer for scientifically unsafe Google Earth Engine Python workflows.
+
+---
+
+## Revision history
+
+| Version | Date (JST) | Scope |
+|---|---|---|
+| 0.1.0 | 2026-08-19 | Initial freeze. |
+| 0.1.1 | 2026-09-22 | EWL203 message template and remediation guidance (§10.3, §16, Appendix A.3). No change to any trigger, non-trigger, severity, reason-code meaning, source fact, evidence field, exit code, or JSON field. |
+
+Every revision MUST be recorded here and MUST be accompanied by an update to the frozen digest recorded in the conformance test suite.
 
 ---
 
@@ -634,9 +646,30 @@ MUST NOT emit:
 - if scale state is unknown;
 - for non-Landsat products in v0.1.0.
 
+### Semantic intent
+
+EWL203 MUST NOT be read as "do not use `normalizedDifference()`".
+
+It means: in a correctly scaled Landsat Collection 2 surface-reflectance workflow, `normalizedDifference()` may silently exclude pixels because either input is negative, and whether those pixels are retained or excluded is a scientific/workflow choice that should be explicit rather than accidental. The decision is left to the user.
+
+The message and remediation MUST NOT state that negative reflectance is always scientifically valid, that the analysis is wrong, or that users must preserve all negative values.
+
 ### Message template
 
-`ee.Image.normalizedDifference() masks a pixel when either input band is negative. Correctly scaled Landsat surface reflectance can contain negative physical values; review whether silent masking is acceptable or use expression() when negatives must be retained.`
+``ee.Image.normalizedDifference() masks output pixels when either input band is negative. Correctly scaled Landsat Collection 2 surface reflectance can contain negative values, so this may silently change which pixels contribute to the analysis. Whether those pixels should be retained or excluded is a scientific/workflow choice that should be explicit. Keep normalizedDifference() if this masking is intentional, or use an explicit expression when retaining negative inputs is appropriate. Run `eo-workflow-lint explain EWL203` for a guarded example.``
+
+### Remediation guidance
+
+EWL203 carries remediation guidance that MUST communicate all of:
+
+1. if excluding negative-input pixels is intentional, keeping `normalizedDifference()` is acceptable; the user may document the choice or suppress EWL203 at that call site;
+2. if retaining negative inputs is appropriate, the normalized difference is computed explicitly (for example with `ee.Image.expression()`) rather than with `normalizedDifference()`;
+3. a zero or near-zero denominator is handled deliberately; the threshold is a workflow choice, not a universal constant;
+4. existing input masks are preserved when the denominator guard is applied; unmasking inputs merely to preserve negative values MUST NOT be recommended.
+
+`explain EWL203` MUST render this guidance under a `remediation:` heading and MAY include an illustrative Earth Engine Python example (Appendix A.3). The example MUST NOT assert undocumented Earth Engine division-by-zero behavior.
+
+Text output for a finding whose rule carries remediation guidance SHOULD render at most three concise `hint:` lines (§16). JSON output MUST NOT gain a remediation field in the 0.1 schema.
 
 ### Evidence fields
 
@@ -1001,6 +1034,8 @@ coverage: 1 recognized dataset, 0 unresolved lineage, 0 unresolved temporal scop
 
 Text output MAY include the CLI-provided path for user convenience; deterministic JSON MUST NOT.
 
+For a finding whose rule carries remediation guidance (in v0.1.1, EWL203 only), text output SHOULD append at most three `hint:` lines after the `source:` line, and MUST NOT print a full code example during `check`. Findings for rules without remediation guidance MUST render exactly as above.
+
 ---
 
 ## 17. CLI
@@ -1172,6 +1207,15 @@ Negative:
 - `expression()`;
 - scale state unknown;
 - non-Landsat product.
+
+Message and remediation (v0.1.1):
+
+- severity remains `CONDITIONAL`;
+- the message contains the explicit scientific/workflow-choice framing and names both the keep-`normalizedDifference()` and explicit-expression branches;
+- `explain EWL203` renders a `remediation:` section that shows an expression-based alternative, deliberate denominator handling, and mask preservation;
+- text output renders at most three `hint:` lines for EWL203 and none for rules without remediation guidance;
+- the JSON finding object is unchanged;
+- the Appendix A.3 guarded expression produces no finding.
 
 ### 21.5 EWL301 tests
 
@@ -1351,7 +1395,7 @@ Candidates only; none are authorized for v0.1.0 implementation:
 
 ## 28. Freeze declaration
 
-This specification is **FROZEN for v0.1.0 implementation**.
+This specification is **FROZEN for v0.1.x implementation**. Changes are permitted only through an authorised revision recorded in the Revision history.
 
 The implementation task is to implement this specification, not redesign it.
 
@@ -1391,18 +1435,26 @@ ndvi = img.normalizedDifference(["SR_B5", "SR_B4"])
 
 Expected: `EWL203 CONDITIONAL`; no EWL201.
 
-## A.3 Avoid EWL203 with expression
+## A.3 Avoid EWL203 with a guarded expression
 
 ```python
 nir = img.select("SR_B5")
 red = img.select("SR_B4")
+
+# A workflow choice for the data at hand, not a universal constant.
+DENOMINATOR_EPSILON = 1e-6
+
+denominator = nir.add(red)
 ndvi = img.expression(
-    "(nir - red) / (nir + red)",
-    {"nir": nir, "red": red},
+    "(nir - red) / denominator",
+    {"nir": nir, "red": red, "denominator": denominator},
 )
+# updateMask() only narrows the mask the inputs already carry; the inputs are
+# never unmask()ed merely to keep negative values.
+ndvi = ndvi.updateMask(denominator.abs().gte(DENOMINATOR_EPSILON))
 ```
 
-Expected: no EWL203.
+Expected: no EWL203. Retaining negative inputs here is a deliberate workflow choice; the bare form `(nir - red) / (nir + red)` also produces no EWL203 but leaves the denominator unguarded.
 
 ## A.4 EWL202 FAIL
 

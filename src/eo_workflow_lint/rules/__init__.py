@@ -28,6 +28,38 @@ class RuleMeta:
     non_triggers: tuple[str, ...]
     message: str
     source_ids: tuple[str, ...]
+    #: Concise, actionable hints (SPECIFICATION §10.3 "Remediation guidance").
+    #: Rendered as ``hint:`` lines by ``check`` and as a ``remediation:`` section
+    #: by ``explain``. Empty for rules that carry no remediation guidance.
+    remediation: tuple[str, ...] = ()
+    #: An illustrative source example shown only by ``explain``.
+    remediation_example: str = ""
+
+
+#: Illustrative Earth Engine Python form for EWL203 (SPECIFICATION §10.3, Appendix A.3).
+#: It retains negative inputs, guards the denominator explicitly, and keeps existing
+#: masks because updateMask() only narrows the mask already carried by the inputs.
+EWL203_REMEDIATION_EXAMPLE = """\
+image = ee.Image("LANDSAT/LC08/C02/T1_L2/LC08_044034_20210508")
+optical = image.select("SR_B.").multiply(0.0000275).add(-0.2)
+image = image.addBands(optical, None, True)
+
+nir = image.select("SR_B5")
+red = image.select("SR_B4")
+
+# The threshold is a workflow choice for your data, not a universal constant.
+DENOMINATOR_EPSILON = 1e-6
+
+denominator = nir.add(red)
+ndvi = image.expression(
+    "(nir - red) / denominator",
+    {"nir": nir, "red": red, "denominator": denominator},
+)
+# Guard only where the denominator is too close to zero. updateMask() combines
+# with the masks the inputs already carry, so no previously masked pixel is
+# revived. Do not unmask() the inputs to keep negative values.
+ndvi = ndvi.updateMask(denominator.abs().gte(DENOMINATOR_EPSILON))
+"""
 
 
 RULES: tuple[RuleMeta, ...] = (
@@ -108,11 +140,25 @@ RULES: tuple[RuleMeta, ...] = (
             "non-Landsat products in v0.1.0",
         ),
         message=(
-            "ee.Image.normalizedDifference() masks a pixel when either input band is negative. "
-            "Correctly scaled Landsat surface reflectance can contain negative physical values; "
-            "review whether silent masking is acceptable or use expression() when negatives must be retained."
+            "ee.Image.normalizedDifference() masks output pixels when either input band is "
+            "negative. Correctly scaled Landsat Collection 2 surface reflectance can contain "
+            "negative values, so this may silently change which pixels contribute to the "
+            "analysis. Whether those pixels should be retained or excluded is a "
+            "scientific/workflow choice that should be explicit. Keep normalizedDifference() "
+            "if this masking is intentional, or use an explicit expression when retaining "
+            "negative inputs is appropriate. Run `eo-workflow-lint explain EWL203` for a "
+            "guarded example."
         ),
         source_ids=("SRC-GEE-NORMALIZED-DIFFERENCE", "SRC-USGS-LANDSAT-C2-SCALE"),
+        remediation=(
+            "keeping normalizedDifference() is acceptable when excluding negative-input "
+            "pixels is intentional; document that choice or suppress EWL203 at this call site",
+            "to retain negative inputs, compute the index with ee.Image.expression() and "
+            "handle a zero or near-zero denominator deliberately",
+            "apply any denominator guard with updateMask() so existing input masks are "
+            "preserved; do not unmask() inputs merely to keep negative values",
+        ),
+        remediation_example=EWL203_REMEDIATION_EXAMPLE,
     ),
     RuleMeta(
         code="EWL301",

@@ -13,6 +13,7 @@ EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
 
 EXPECTED = {
     "clean_workflow.py": (0, "PASS", []),
+    "landsat_ndvi_scaled_negative_mask.py": (0, "CONDITIONAL", ["EWL203"]),
     "landsat_ndvi_unscaled.py": (1, "FAIL", ["EWL201"]),
     "landsat_scale_mismatch.py": (1, "FAIL", ["EWL202"]),
     "reduce_region_no_scale.py": (0, "CONDITIONAL", ["EWL401"]),

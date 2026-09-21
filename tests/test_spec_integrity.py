@@ -1,4 +1,4 @@
-"""The FROZEN specification must never be modified within the 0.1.x series.
+"""The FROZEN specification must never be modified except by an authorised revision.
 
 Release preparation uncovered a real way this could happen silently: newer ruff
 versions format Python code blocks inside Markdown files, and `ruff format`
@@ -7,7 +7,8 @@ Markdown, and this test is the backstop for any other tool that tries.
 
 If the specification owner deliberately revises the specification, this test is
 expected to fail loudly and the recorded digest must be updated as part of that
-authorised change.
+authorised change, together with an entry in the specification's Revision
+history (v0.1.1: EWL203 message template and remediation guidance).
 """
 
 from __future__ import annotations
@@ -20,8 +21,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SPECIFICATION = REPO_ROOT / "SPECIFICATION.md"
 
-#: SHA-256 of the v0.1.0 FROZEN specification, recorded at independent review.
-FROZEN_SHA256 = "778edb8482f6ce8836db59b997a39df052579eddbe9551dff02cf529a49a0bdd"
+#: SHA-256 of the FROZEN specification. v0.1.0 was recorded at independent
+#: review; v0.1.1 records the authorised EWL203 revision of 2026-09-22.
+FROZEN_SHA256 = "41b697090c267572361eab597db26b64493c7d473f2480a6a2ba18f64c5b9240"
 
 
 def _require_specification() -> Path:

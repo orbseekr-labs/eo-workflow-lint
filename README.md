@@ -12,7 +12,7 @@ documented availability gap.
 It is a linter, not an assistant. It never runs your code, never contacts a network, and never
 needs Earth Engine credentials.
 
-- Version: **0.1.0**
+- Version: **0.1.1**
 - Specification: [`SPECIFICATION.md`](SPECIFICATION.md) (frozen for the 0.1.x series)
 - Catalog version: `2026-08-19.1`
 - Python: 3.11+
@@ -37,7 +37,7 @@ Python 3.11 or newer. `eo-workflow-lint` has no runtime dependencies.
 **Install the released version directly from GitHub:**
 
 ```bash
-pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.1.0"
+pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.1.1"
 ```
 
 **Or install from a local clone**, which you will want if you intend to run the tests or read the
@@ -101,13 +101,32 @@ coverage: 1 recognized dataset, 1 supported operation check, 0 unresolved lineag
 |---|---|---|---|
 | `EWL201` | FAIL | `LANDSAT_C2_SR_UNSCALED_NORMALIZED_DIFFERENCE` | `normalizedDifference()` over encoded Landsat Collection 2 Level-2 SR digital numbers before the documented offset is applied |
 | `EWL202` | FAIL | `LANDSAT_C2_BAND_SCALE_MISMATCH` | The documented SR scale/offset pair applied to a proven ST band, or the ST pair applied to proven SR bands |
-| `EWL203` | CONDITIONAL | `NORMALIZED_DIFFERENCE_NEGATIVE_MASK_RISK` | Correctly scaled Landsat SR passed to `normalizedDifference()`, which masks pixels when either input is negative |
+| `EWL203` | CONDITIONAL | `NORMALIZED_DIFFERENCE_NEGATIVE_MASK_RISK` | Correctly scaled Landsat SR passed to `normalizedDifference()`, which masks output pixels when either input is negative — a workflow choice that should be explicit (see below) |
 | `EWL301` | FAIL | `SENTINEL1_GRD_REDUNDANT_DB_CONVERSION` | A second explicit `10*log10()` conversion on `COPERNICUS/S1_GRD`, which is already in dB |
 | `EWL401` | CONDITIONAL | `ANALYSIS_SCALE_UNSPECIFIED` | `reduceRegion()` / `reduceRegions()` with neither `scale` nor `crsTransform` explicitly supplied |
 | `EWL501` | FAIL | `SENTINEL2_QA60_UNAVAILABLE` | `QA60` use whose entire known interval falls inside the documented QA60 gap |
 | `EWL502` | CONDITIONAL | `SENTINEL2_QA60_GAP_OVERLAP` | `QA60` use across an interval that overlaps, but is not contained by, the QA60 gap |
 
 Run `eo-workflow-lint explain <CODE>` for each rule's exact triggers, non-triggers, and sources.
+
+### EWL203: an explicit choice, not a prohibition
+
+EWL203 does **not** mean "do not use `normalizedDifference()`". Earth Engine documents that
+`ee.Image.normalizedDifference()` masks an output pixel when either input band is negative.
+Correctly scaled Landsat Collection 2 surface reflectance can contain negative values, so the
+call may silently change which pixels contribute to the analysis. Whether those pixels are
+retained or excluded is a scientific/workflow choice; EWL203 asks that it be explicit.
+
+- If excluding them is intentional, keep `normalizedDifference()` and document the choice, or
+  suppress EWL203 at that call site.
+- If retaining them is appropriate, compute the index with `ee.Image.expression()`, handle a
+  zero or near-zero denominator deliberately, and apply that guard with `updateMask()` so the
+  masks the inputs already carry are preserved. Do not `unmask()` inputs merely to keep
+  negative values.
+
+`check` prints these as short `hint:` lines; `eo-workflow-lint explain EWL203` prints a
+guarded example (`examples/clean_workflow.py` is the same pattern in a full workflow, and
+`examples/landsat_ndvi_scaled_negative_mask.py` is the minimal trigger).
 
 ## Verdicts
 
@@ -140,7 +159,7 @@ threshold; they are counted in `suppressed_finding_count`.
 ```yaml
 - name: Lint Earth Engine workflows
   run: |
-    pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.1.0"
+    pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.1.1"
     for f in $(git ls-files '*.py'); do
       eo-workflow-lint check "$f" --fail-on conditional
     done
@@ -158,7 +177,7 @@ eo-workflow-lint check workflow.py --format json > report.json
 ```json
 {
   "schema_version": "0.1",
-  "tool_version": "0.1.0",
+  "tool_version": "0.1.1",
   "catalog_version": "2026-08-19.1",
   "input": { "sha256": "…", "byte_length": 1234 },
   "verdict": "FAIL",
