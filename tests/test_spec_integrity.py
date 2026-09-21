@@ -23,7 +23,7 @@ SPECIFICATION = REPO_ROOT / "SPECIFICATION.md"
 
 #: SHA-256 of the FROZEN specification. v0.1.0 was recorded at independent
 #: review; v0.1.1 records the authorised EWL203 revision of 2026-09-22.
-FROZEN_SHA256 = "41b697090c267572361eab597db26b64493c7d473f2480a6a2ba18f64c5b9240"
+FROZEN_SHA256 = "baea0a78cc893180322f9fe3b62ee2b12188acc47fee33465fdec60bba5db303"
 
 
 def _require_specification() -> Path:

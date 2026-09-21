@@ -17,7 +17,7 @@
 | Version | Date (JST) | Scope |
 |---|---|---|
 | 0.1.0 | 2026-08-19 | Initial freeze. |
-| 0.1.1 | 2026-09-22 | EWL203 message template and remediation guidance (§10.3, §16, Appendix A.3). No change to any trigger, non-trigger, severity, reason-code meaning, source fact, evidence field, exit code, or JSON field. |
+| 0.1.1 | 2026-09-22 | EWL203 message template and remediation guidance (§10.3, §16, Appendix A.3); §15 example tool_version aligned to 0.1.1. No change to any trigger, non-trigger, severity, reason-code meaning, source fact, evidence field, exit code, or JSON field. |
 
 Every revision MUST be recorded here and MUST be accompanied by an update to the frozen digest recorded in the conformance test suite.
 
@@ -976,7 +976,7 @@ The conceptual v0.1.0 JSON shape is:
 ```json
 {
   "schema_version": "0.1",
-  "tool_version": "0.1.0",
+  "tool_version": "0.1.1",
   "catalog_version": "2026-08-19.1",
   "input": {
     "sha256": "<64 lowercase hex chars>",
