@@ -189,3 +189,136 @@ jobs:
             echo "unprivileged user namespaces unavailable on this runner; \
             skipped (the socket-blocked step above is the enforced proof)"
           fi
+
+  action-self-test:
+    name: GitHub Action self-test (uses ./)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # A. Clean workflow -> PASS
+      - name: A. clean example
+        id: clean
+        uses: ./
+        with:
+          fail-on: conditional
+          paths: examples/clean_workflow.py
+      - name: A. assert PASS, 1 file, 0 findings, exit 0
+        env:
+          VERDICT: ${{ steps.clean.outputs.verdict }}
+          FILES: ${{ steps.clean.outputs.files-checked }}
+          FINDINGS: ${{ steps.clean.outputs.findings }}
+          EXIT: ${{ steps.clean.outputs.exit-code }}
+        run: |
+          set -euo pipefail
+          test "$VERDICT" = "PASS"
+          test "$FILES" = "1"
+          test "$FINDINGS" = "0"
+          test "$EXIT" = "0"
+          echo "ok: A"
+
+      # B. CONDITIONAL finding below the default threshold -> step succeeds
+      - name: B. EWL203 example with fail-on=fail
+        id: conditional
+        uses: ./
+        with:
+          fail-on: fail
+          paths: examples/landsat_ndvi_scaled_negative_mask.py
+      - name: B. assert CONDITIONAL, conditional-count >= 1, exit 0
+        env:
+          VERDICT: ${{ steps.conditional.outputs.verdict }}
+          CONDITIONALS: ${{ steps.conditional.outputs.conditional-count }}
+          EXIT: ${{ steps.conditional.outputs.exit-code }}
+        run: |
+          set -euo pipefail
+          test "$VERDICT" = "CONDITIONAL"
+          test "$CONDITIONALS" -ge 1
+          test "$EXIT" = "0"
+          echo "ok: B"
+
+      # C. Same CONDITIONAL finding at the stricter threshold -> step fails
+      - name: C. EWL203 example with fail-on=conditional (expected to fail)
+        id: threshold
+        uses: ./
+        continue-on-error: true
+        with:
+          fail-on: conditional
+          paths: examples/landsat_ndvi_scaled_negative_mask.py
+      - name: C. assert step failed on the threshold with exit 1
+        env:
+          OUTCOME: ${{ steps.threshold.outcome }}
+          VERDICT: ${{ steps.threshold.outputs.verdict }}
+          EXIT: ${{ steps.threshold.outputs.exit-code }}
+        run: |
+          set -euo pipefail
+          test "$OUTCOME" = "failure"
+          test "$VERDICT" = "CONDITIONAL"
+          test "$EXIT" = "1"
+          echo "ok: C"
+
+      # D. Deterministic FAIL finding -> step fails
+      - name: D. EWL201 example (expected to fail)
+        id: fail
+        uses: ./
+        continue-on-error: true
+        with:
+          paths: examples/landsat_ndvi_unscaled.py
+      - name: D. assert FAIL, fail-count >= 1, step failed with exit 1
+        env:
+          OUTCOME: ${{ steps.fail.outcome }}
+          VERDICT: ${{ steps.fail.outputs.verdict }}
+          FAILS: ${{ steps.fail.outputs.fail-count }}
+          EXIT: ${{ steps.fail.outputs.exit-code }}
+        run: |
+          set -euo pipefail
+          test "$OUTCOME" = "failure"
+          test "$VERDICT" = "FAIL"
+          test "$FAILS" -ge 1
+          test "$EXIT" = "1"
+          echo "ok: D"
+
+      # E. Unanalyzable input -> exit 2, distinct from a scientific finding, and
+      #    the analyzed fixture is never executed.
+      - name: E. syntax-error fixture (expected to fail)
+        id: broken
+        uses: ./
+        continue-on-error: true
+        with:
+          paths: |
+            examples/clean_workflow.py
+            tests/fixtures/side_effect.py
+            .github/self-test/broken.py
+      - name: E. assert not-analyzable=1, exit 2, no findings, fixture not executed
+        env:
+          OUTCOME: ${{ steps.broken.outcome }}
+          EXIT: ${{ steps.broken.outputs.exit-code }}
+          NOT_ANALYZABLE: ${{ steps.broken.outputs.not-analyzable }}
+          FINDINGS: ${{ steps.broken.outputs.findings }}
+        run: |
+          set -euo pipefail
+          test "$OUTCOME" = "failure"
+          test "$EXIT" = "2"
+          test "$NOT_ANALYZABLE" = "1"
+          test "$FINDINGS" = "0"
+          test ! -e tests/fixtures/SIDE_EFFECT_MARKER
+          echo "ok: E"
+
+      # No matching files -> zero checked, success
+      - name: no matching pathspec
+        id: none
+        uses: ./
+        with:
+          paths: docs/does-not-exist/**
+      - name: assert 0 files, PASS, exit 0
+        env:
+          VERDICT: ${{ steps.none.outputs.verdict }}
+          FILES: ${{ steps.none.outputs.files-checked }}
+          EXIT: ${{ steps.none.outputs.exit-code }}
+        run: |
+          set -euo pipefail
+          test "$VERDICT" = "PASS"
+          test "$FILES" = "0"
+          test "$EXIT" = "0"
+          echo "ok: zero files"

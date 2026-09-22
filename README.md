@@ -12,7 +12,7 @@ documented availability gap.
 It is a linter, not an assistant. It never runs your code, never contacts a network, and never
 needs Earth Engine credentials.
 
-- Version: **0.1.1**
+- Version: **0.1.2**
 - Specification: [`SPECIFICATION.md`](SPECIFICATION.md) (frozen for the 0.1.x series)
 - Catalog version: `2026-08-19.1`
 - Python: 3.11+
@@ -37,7 +37,7 @@ Python 3.11 or newer. `eo-workflow-lint` has no runtime dependencies.
 **Install the released version directly from GitHub:**
 
 ```bash
-pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.1.1"
+pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.1.2"
 ```
 
 **Or install from a local clone**, which you will want if you intend to run the tests or read the
@@ -154,15 +154,55 @@ A blank line between the directive and the target breaks the association, and a 
 directive never suppresses anything. Suppressed findings do not affect the verdict or the exit
 threshold; they are counted in `suppressed_finding_count`.
 
-## CI usage
+## GitHub Action
+
+Add the official action to a workflow to lint every tracked `.py` file on each pull request:
 
 ```yaml
-- name: Lint Earth Engine workflows
-  run: |
-    pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.1.1"
-    for f in $(git ls-files '*.py'); do
-      eo-workflow-lint check "$f" --fail-on conditional
-    done
+name: eo-workflow-lint
+on: [pull_request]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: orbseekr-labs/eo-workflow-lint@v0.1.2
+        with:
+          fail-on: conditional
+```
+
+Findings appear as pull-request annotations (`FAIL` as errors, `CONDITIONAL` as warnings,
+with file, line and reason code) and as a job Step Summary with per-file verdict totals. The
+analysis runs entirely on the GitHub runner from the pinned tag's own source tree: no Earth
+Engine credentials, no network access, no telemetry, and your source code is never uploaded
+anywhere.
+
+| Input | Default | Meaning |
+|---|---|---|
+| `fail-on` | `fail` | `fail` fails the step only on FAIL findings; `conditional` also fails on CONDITIONAL |
+| `paths` | `*.py` | Newline-separated Git pathspecs; only `.py` matches are analyzed |
+
+```yaml
+      - uses: orbseekr-labs/eo-workflow-lint@v0.1.2
+        with:
+          fail-on: conditional
+          paths: |
+            *.py
+            :!notebooks/**
+```
+
+A file that cannot be analyzed (for example a Python syntax error) is reported as
+"not analyzable", counted separately from findings, and fails the step with exit code 2 —
+the same distinction the CLI makes. Outputs: `verdict`, `files-checked`, `findings`,
+`fail-count`, `conditional-count`, `not-analyzable`, `exit-code`.
+
+## Other CI systems
+
+```bash
+pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.1.2"
+git ls-files -z -- '*.py' | xargs -0 -n1 eo-workflow-lint check --fail-on conditional
 ```
 
 The JSON report is stable for a given `(source bytes, tool version, catalog version, options)`
@@ -177,7 +217,7 @@ eo-workflow-lint check workflow.py --format json > report.json
 ```json
 {
   "schema_version": "0.1",
-  "tool_version": "0.1.1",
+  "tool_version": "0.1.2",
   "catalog_version": "2026-08-19.1",
   "input": { "sha256": "…", "byte_length": 1234 },
   "verdict": "FAIL",

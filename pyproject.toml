@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eo-workflow-lint"
-version = "0.1.1"
+version = "0.1.2"
 description = "A deterministic, offline static analyzer for scientifically unsafe Earth observation workflows."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -35,7 +35,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.5"]
+dev = ["pytest>=8", "ruff>=0.5", "pyyaml>=6"]
 
 [project.scripts]
 eo-workflow-lint = "eo_workflow_lint.cli:run"
@@ -52,11 +52,13 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 100
-src = ["src", "tests"]
+src = ["src", "tests", "action"]
 target-version = "py311"
 # Ruff must never rewrite Markdown. SPECIFICATION.md is FROZEN, and newer ruff
 # versions format Python code blocks inside Markdown files by default.
-extend-exclude = ["*.md"]
+# .github/self-test holds a deliberately invalid Python file for the Action
+# self-test; it must not be parsed by ruff.
+extend-exclude = ["*.md", ".github/self-test"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "C4", "SIM", "RUF"]

@@ -30,7 +30,7 @@ def test_json_schema_shape_and_key_order() -> None:
         "analysis",
     ]
     assert payload["schema_version"] == "0.1"
-    assert payload["tool_version"] == "0.1.1"
+    assert payload["tool_version"] == "0.1.2"
     assert payload["catalog_version"] == "2026-08-19.1"
     assert list(payload["input"]) == ["sha256", "byte_length"]
     assert list(payload["findings"][0]) == [

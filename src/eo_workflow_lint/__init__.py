@@ -6,5 +6,5 @@ Implements SPECIFICATION.md v0.1.1 (FROZEN).
 
 __all__ = ["SCHEMA_VERSION", "__version__"]
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 SCHEMA_VERSION = "0.1"
