@@ -176,7 +176,7 @@ def test_explain_unknown_code_exits_two() -> None:
 def test_sources_command_lists_the_registry() -> None:
     code, out, _ = run_cli(["sources"])
     assert code == 0
-    assert "catalog version: 2026-08-19.1" in out
+    assert "catalog version: 2026-09-22.1" in out
     for source_id in (
         "SRC-GEE-LANDSAT-C1-C2",
         "SRC-GEE-NORMALIZED-DIFFERENCE",

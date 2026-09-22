@@ -23,7 +23,7 @@ LANDSAT_C2_L2_COLLECTIONS = [
 
 
 def test_catalog_version() -> None:
-    assert catalog.CATALOG_VERSION == "2026-08-19.1"
+    assert catalog.CATALOG_VERSION == "2026-09-22.1"
 
 
 @pytest.mark.parametrize("dataset_id", LANDSAT_C2_L2_COLLECTIONS)

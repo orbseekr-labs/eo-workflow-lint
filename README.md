@@ -12,9 +12,9 @@ documented availability gap.
 It is a linter, not an assistant. It never runs your code, never contacts a network, and never
 needs Earth Engine credentials.
 
-- Version: **0.1.2**
+- Version: **0.2.0**
 - Specification: [`SPECIFICATION.md`](SPECIFICATION.md) (frozen for the 0.1.x series)
-- Catalog version: `2026-08-19.1`
+- Catalog version: `2026-09-22.1`
 - Python: 3.11+
 - Runtime dependencies: none (standard library only)
 - License: Apache-2.0
@@ -37,7 +37,7 @@ Python 3.11 or newer. `eo-workflow-lint` has no runtime dependencies.
 **Install the released version directly from GitHub:**
 
 ```bash
-pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.1.2"
+pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.2.0"
 ```
 
 **Or install from a local clone**, which you will want if you intend to run the tests or read the
@@ -168,7 +168,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: orbseekr-labs/eo-workflow-lint@v0.1.2
+      - uses: orbseekr-labs/eo-workflow-lint@v0.2.0
         with:
           fail-on: conditional
 ```
@@ -185,7 +185,7 @@ anywhere.
 | `paths` | `*.py` | Newline-separated Git pathspecs; only `.py` matches are analyzed |
 
 ```yaml
-      - uses: orbseekr-labs/eo-workflow-lint@v0.1.2
+      - uses: orbseekr-labs/eo-workflow-lint@v0.2.0
         with:
           fail-on: conditional
           paths: |
@@ -201,7 +201,7 @@ the same distinction the CLI makes. Outputs: `verdict`, `files-checked`, `findin
 ## Other CI systems
 
 ```bash
-pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.1.2"
+pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.2.0"
 git ls-files -z -- '*.py' | xargs -0 -n1 eo-workflow-lint check --fail-on conditional
 ```
 
@@ -216,9 +216,9 @@ eo-workflow-lint check workflow.py --format json > report.json
 
 ```json
 {
-  "schema_version": "0.1",
-  "tool_version": "0.1.2",
-  "catalog_version": "2026-08-19.1",
+  "schema_version": "0.2",
+  "tool_version": "0.2.0",
+  "catalog_version": "2026-09-22.1",
   "input": { "sha256": "…", "byte_length": 1234 },
   "verdict": "FAIL",
   "findings": [
@@ -253,7 +253,7 @@ so identical input bytes produce byte-identical output on any machine.
 ## Provenance
 
 Every finding carries the source IDs it rests on. The bundled catalog is frozen at version
-`2026-08-19.1` and is never refreshed at runtime; `eo-workflow-lint sources` prints the full
+`2026-09-22.1` and is never refreshed at runtime; `eo-workflow-lint sources` prints the full
 registry with titles, URLs, and the specific facts v0.1.0 relies on:
 
 `SRC-USGS-LANDSAT-C2-SCALE`, `SRC-GEE-LANDSAT-C1-C2`, `SRC-GEE-NORMALIZED-DIFFERENCE`,

@@ -22,6 +22,7 @@ __all__ = [
     "SENTINEL1_SOURCE_IDS",
     "SENTINEL2_SOURCE_IDS",
     "SR_REGEX_SELECTOR",
+    "ST_REGEX_SELECTOR",
     "DatasetInfo",
     "LandsatConstants",
     "Source",
@@ -44,6 +45,10 @@ FAMILY_SENTINEL2 = "SENTINEL2"
 _SR_BAND_RE = re.compile(r"^SR_B[1-7]$")
 
 SR_REGEX_SELECTOR = "SR_B."
+#: The thermal counterpart of ``SR_B.`` used by the documented scaling idiom
+#: (SPECIFICATION v0.2.0 §8.7). It proves the ST band *family* only; it does not
+#: name a concrete band, so it never establishes a CORRECTLY_SCALED ST state.
+ST_REGEX_SELECTOR = "ST_B.*"
 QA60_BAND = "QA60"
 
 

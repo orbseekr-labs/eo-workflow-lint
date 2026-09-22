@@ -14,6 +14,7 @@ from typing import Any
 from . import catalog
 
 __all__ = [
+    "MAX_STRING_ALTERNATIVES",
     "PASS_THROUGH_METHODS",
     "UNKNOWN_VALUE",
     "BandFamily",
@@ -22,7 +23,9 @@ __all__ = [
     "ImageState",
     "ImageValue",
     "LogPending",
+    "OneOfValue",
     "ScaleState",
+    "SequenceValue",
     "UnknownValue",
     "Value",
     "classify_bands",
@@ -165,6 +168,38 @@ class ConstValue:
     value: Any
 
 
+#: Upper bound on the branch alternatives carried by a :class:`OneOfValue`
+#: (SPECIFICATION v0.2.0 §8.10). Beyond it the value degrades to UNKNOWN.
+MAX_STRING_ALTERNATIVES = 4
+
+
+@dataclass(frozen=True)
+class OneOfValue:
+    """A finite set of statically proven string constants from merged branches.
+
+    Deliberately string-only: it exists so that a band name chosen in an
+    ``if``/``else`` stays provable, and it never participates in arithmetic or
+    any other operation (SPECIFICATION v0.2.0 §8.10).
+    """
+
+    options: frozenset[str]
+
+    def sorted_options(self) -> tuple[str, ...]:
+        return tuple(sorted(self.options))
+
+
+@dataclass(frozen=True)
+class SequenceValue:
+    """A list/tuple literal whose elements were evaluated individually.
+
+    Produced only when a literal sequence could not collapse to a ``ConstValue``
+    because some element is a :class:`OneOfValue`. It carries no meaning of its
+    own; a rule that wants band names asks for the finite alternatives.
+    """
+
+    elements: tuple[Value, ...]
+
+
 @dataclass(frozen=True)
 class UnknownValue:
     """A value the analyzer cannot resolve."""
@@ -172,7 +207,7 @@ class UnknownValue:
 
 UNKNOWN_VALUE = UnknownValue()
 
-Value = ImageValue | ConstValue | UnknownValue
+Value = ImageValue | ConstValue | OneOfValue | SequenceValue | UnknownValue
 
 
 def classify_bands(names: tuple[str, ...], platform: str | None) -> BandFamily:
@@ -220,12 +255,29 @@ def merge_states(left: ImageState, right: ImageState) -> ImageState:
     )
 
 
+def _string_options(value: Value) -> frozenset[str] | None:
+    """The string alternatives ``value`` stands for, or None if it is not a string."""
+    if isinstance(value, ConstValue) and isinstance(value.value, str):
+        return frozenset({value.value})
+    if isinstance(value, OneOfValue):
+        return value.options
+    return None
+
+
 def merge_values(left: Value, right: Value) -> Value:
     """Merge two branch values conservatively."""
     if left == right:
         return left
     if isinstance(left, ImageValue) and isinstance(right, ImageValue):
         return ImageValue(merge_states(left.state, right.state))
+
+    # Branch-selected string constants stay provable as a finite alternative set
+    # (SPECIFICATION v0.2.0 §8.10); anything else degrades to UNKNOWN.
+    left_options, right_options = _string_options(left), _string_options(right)
+    if left_options is not None and right_options is not None:
+        options = left_options | right_options
+        if len(options) <= MAX_STRING_ALTERNATIVES:
+            return OneOfValue(options)
     return UNKNOWN_VALUE
 
 

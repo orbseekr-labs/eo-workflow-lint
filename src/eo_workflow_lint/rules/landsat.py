@@ -10,28 +10,46 @@ from . import build_finding, rule_meta
 __all__ = ["check_normalized_difference", "check_scale_transform"]
 
 
-def _all_sr_bands(bands: tuple[str, ...]) -> bool:
-    return len(bands) == 2 and all(catalog.landsat_sr_band(name) for name in bands)
+def _every_reading_is_an_sr_pair(arguments: tuple[tuple[str, ...], ...]) -> bool:
+    """True when every cross-product reading is a two-band proven SR pair."""
+    return len(arguments) == 2 and all(
+        catalog.landsat_sr_band(name) for options in arguments for name in options
+    )
 
 
 def check_normalized_difference(
-    state: ImageState, bands: tuple[str, ...] | None, line: int, column: int
+    state: ImageState,
+    arguments: tuple[tuple[str, ...], ...] | None,
+    line: int,
+    column: int,
 ) -> Finding | None:
     """EWL201 / EWL203 decision for a ``normalizedDifference()`` call.
 
-    ``bands`` is the statically proven two-band input, or ``None`` when band
-    identity could not be proven.
+    ``arguments`` gives the possible values of each band argument: a single name
+    per argument for an ordinary literal pair, or the finite alternative set
+    proven from merged branches (SPECIFICATION v0.2.0 §8.10.1). It is ``None``
+    when band identity could not be proven.
+
+    A finding is emitted only if *every* cross-product reading is a two-band
+    proven SR pair, so the rule never fires on an unproven reading. Branch
+    correlation between the two arguments is not tracked, which is why the
+    evidence reports the per-argument possibilities rather than pairs it cannot
+    prove are reachable.
     """
     if state.family != catalog.FAMILY_LANDSAT_C2_L2:
         return None
-    if bands is None or not _all_sr_bands(bands):
+    if not arguments or not _every_reading_is_an_sr_pair(arguments):
         return None
 
-    evidence = {
-        "dataset_id": state.dataset_id,
-        "bands": bands,
-        "sr_scale_state": state.sr_scale.value,
-    }
+    evidence: dict[str, object] = {"dataset_id": state.dataset_id}
+    if all(len(options) == 1 for options in arguments):
+        evidence["bands"] = tuple(options[0] for options in arguments)
+    else:
+        # Never both keys: the evidence states exactly what was proven (§10.1, §10.3).
+        evidence["band_argument_alternatives"] = tuple(
+            tuple(sorted(options)) for options in arguments
+        )
+    evidence["sr_scale_state"] = state.sr_scale.value
 
     if state.sr_scale is ScaleState.RAW:
         meta = rule_meta("EWL201")

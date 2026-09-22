@@ -1,5 +1,5 @@
 {
-  "catalog_version": "2026-08-19.1",
+  "catalog_version": "2026-09-22.1",
   "sources": [
     {
       "id": "SRC-GEE-LANDSAT-C1-C2",
@@ -97,6 +97,7 @@
       "LT05": "ST_B6"
     },
     "surface_reflectance_regex_selector": "SR_B.",
+    "surface_temperature_regex_selector": "ST_B.*",
     "surface_reflectance_scale": 0.0000275,
     "surface_reflectance_offset": -0.2,
     "surface_temperature_scale": 0.00341802,

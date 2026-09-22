@@ -13,6 +13,7 @@ from typing import Any
 
 from . import SCHEMA_VERSION, __version__, catalog
 from .lineage import (
+    MAX_STRING_ALTERNATIVES,
     PASS_THROUGH_METHODS,
     UNKNOWN_VALUE,
     BandFamily,
@@ -21,11 +22,14 @@ from .lineage import (
     ImageState,
     ImageValue,
     LogPending,
+    OneOfValue,
     ScaleState,
+    SequenceValue,
     Value,
     classify_bands,
     intersect_intervals,
     merge_envs,
+    merge_states,
     merge_values,
 )
 from .models import Coverage, Finding, InputInfo, Report
@@ -91,6 +95,35 @@ def _as_string(value: Value) -> str | None:
     return None
 
 
+def _band_argument_alternatives(values: list[Value]) -> tuple[tuple[str, ...], ...] | None:
+    """The possible values of each ``normalizedDifference()`` band argument.
+
+    Element *i* is the deterministically sorted set of names argument *i* could
+    take. Returns None when an argument is not a proven string or finite
+    :class:`OneOfValue`, or when the number of cross-product readings exceeds
+    the cap (SPECIFICATION v0.2.0 §8.10.1).
+
+    Branch correlation between arguments is not tracked, so this per-argument
+    form is exactly what the analyzer proved; the readings it implies are
+    derived separately by :func:`_band_pair_readings`.
+    """
+    options: list[tuple[str, ...]] = []
+    for value in values:
+        if isinstance(value, ConstValue) and isinstance(value.value, str):
+            options.append((value.value,))
+        elif isinstance(value, OneOfValue):
+            options.append(value.sorted_options())
+        else:
+            return None
+
+    total = 1
+    for item in options:
+        total *= len(item)
+    if total > MAX_STRING_ALTERNATIVES:
+        return None
+    return tuple(options)
+
+
 def _as_string_sequence(value: Value) -> tuple[str, ...] | None:
     if not isinstance(value, ConstValue):
         return None
@@ -115,12 +148,14 @@ class Analyzer:
         self._analyzed_functions: set[int] = set()
         self._active_functions: set[int] = set()
         self._return_stack: list[list[Value]] = []
+        self._module_bindings: dict[str, Value] = {}
 
     # ------------------------------------------------------------------ driver
 
     def run(self) -> tuple[list[Finding], Coverage]:
         env: dict[str, Value] = {}
         self._exec_block(self.tree.body, env)
+        self._module_bindings = self._safe_module_bindings(env)
         self._sweep_unanalyzed_functions()
 
         coverage = Coverage(
@@ -131,11 +166,57 @@ class Analyzer:
         )
         return list(self._findings.values()), coverage
 
+    def _safe_module_bindings(self, env: dict[str, Value]) -> dict[str, Value]:
+        """Module-level names a function body may rely on (SPECIFICATION v0.2.0 §8.3).
+
+        Only bindings whose value cannot itself carry lineage are seeded:
+        helper functions, lambdas, module references and resolved constants. An
+        ``ImageValue`` is deliberately excluded, because a module-level image
+        reaching a function body is not proof that it is the value in use there.
+
+        A name assigned more than once at module level is also excluded: picking
+        the final binding would be a guess about execution order (§8.1).
+        """
+        rebound = self._module_rebound_names()
+        return {
+            name: value
+            for name, value in env.items()
+            if name not in rebound
+            and isinstance(value, (FunctionValue, LambdaValue, ModuleValue, ConstValue))
+        }
+
+    def _module_rebound_names(self) -> set[str]:
+        """Module-level names bound by more than one top-level statement."""
+        counts: dict[str, int] = {}
+
+        def count(name: str) -> None:
+            counts[name] = counts.get(name, 0) + 1
+
+        def count_target(target: ast.expr) -> None:
+            if isinstance(target, ast.Name):
+                count(target.id)
+            elif isinstance(target, (ast.Tuple, ast.List)):
+                for element in target.elts:
+                    count_target(element)
+            elif isinstance(target, ast.Starred):
+                count_target(target.value)
+
+        for stmt in self.tree.body:
+            if isinstance(stmt, ast.Assign):
+                for target in stmt.targets:
+                    count_target(target)
+            elif isinstance(stmt, (ast.AnnAssign, ast.AugAssign)):
+                count_target(stmt.target)
+            elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                count(stmt.name)
+        return {name for name, total in counts.items() if total > 1}
+
     def _sweep_unanalyzed_functions(self) -> None:
         """Analyze functions never reached through ``.map()`` with unknown parameters.
 
-        Lineage-dependent rules cannot fire there, but lineage-free checks such
-        as EWL401 still apply.
+        Module-level helpers stay visible (SPECIFICATION v0.2.0 §8.9) so that a
+        pipeline written inside a function can still resolve ``.map(helper)``.
+        Parameters shadow them, and any local assignment overwrites them in turn.
         """
         pending = [
             node
@@ -147,7 +228,10 @@ class Analyzer:
         for node in pending:
             if id(node) in self._analyzed_functions:
                 continue
-            env: dict[str, Value] = {arg.arg: UNKNOWN_VALUE for arg in self._all_args(node)}
+            env: dict[str, Value] = dict(self._module_bindings)
+            # Parameters are authoritative: an argument is unknown even when a
+            # module-level name happens to match it.
+            env.update({arg.arg: UNKNOWN_VALUE for arg in self._all_args(node)})
             self._analyzed_functions.add(id(node))
             self._active_functions.add(id(node))
             self._return_stack.append([])
@@ -332,6 +416,9 @@ class Analyzer:
             values = [self._eval(element, env) for element in node.elts]
             if all(isinstance(item, ConstValue) for item in values):
                 return ConstValue(tuple(item.value for item in values))  # type: ignore[union-attr]
+            if any(isinstance(item, OneOfValue) for item in values):
+                # Keep branch-selected string constants reachable (§8.10).
+                return SequenceValue(tuple(values))
             return UNKNOWN_VALUE
 
         if isinstance(node, ast.UnaryOp):
@@ -511,6 +598,15 @@ class Analyzer:
         if method in _ELEMENT_PASS_THROUGH:
             return ImageValue(state.element())
 
+        if method == "median" and state.is_collection:
+            # SPECIFICATION v0.2.0 §8.5: the documented scale/offset transforms are
+            # increasing affine maps, and the per-pixel median is equivariant under
+            # them, so median(scale(x)) == scale(median(x)) and the scale state
+            # survives. ``ImageCollection.median()`` also keeps the input band
+            # names, unlike ``reduce(ee.Reducer.median())``, which is why only this
+            # convenience method is recognised.
+            return ImageValue(state.element())
+
         if method == "multiply":
             return ImageValue(self._apply_multiply(state, positional, node))
 
@@ -536,6 +632,9 @@ class Analyzer:
 
         if method == "normalizedDifference":
             return ImageValue(self._apply_normalized_difference(state, positional, node))
+
+        if method == "merge":
+            return ImageValue(self._apply_merge(state, positional))
 
         if method == "map":
             return self._apply_map(state, positional, node, env)
@@ -571,6 +670,13 @@ class Analyzer:
             # The exact ``SR_B.`` selector is recognised as the Landsat SR family
             # for the documented scaling idiom (SPECIFICATION §8.7).
             return state.cleared(bands=None, band_family=BandFamily.SR)
+
+        if names == (catalog.ST_REGEX_SELECTOR,):
+            # ``ST_B.*`` is the thermal half of the same documented idiom. It proves
+            # the family, which is what §9.4 needs to keep a non-SR overwrite from
+            # erasing a proven SR state, but it names no concrete band, so ``bands``
+            # stays None and no CORRECTLY_SCALED ST state can follow (§9.2).
+            return state.cleared(bands=None, band_family=BandFamily.ST)
 
         return state.cleared(bands=names, band_family=classify_bands(names, state.platform))
 
@@ -647,6 +753,33 @@ class Analyzer:
 
         return state.numerically_unknown()
 
+    def _apply_merge(self, state: ImageState, positional: list[Value]) -> ImageState:
+        """``ImageCollection.merge()`` (SPECIFICATION v0.2.0 §8.5).
+
+        Lineage survives only when both sides are proven collections of the same
+        proven product family. Everything else degrades: ``merge_states`` keeps a
+        property only where the two sides agree, so a differing dataset ID or
+        platform becomes None and a differing scale state becomes UNKNOWN.
+        """
+        other = positional[0] if positional else UNKNOWN_VALUE
+        if (
+            not isinstance(other, ImageValue)
+            or not state.is_collection
+            or not other.state.is_collection
+            or state.family is None
+            or state.family != other.state.family
+        ):
+            return state.numerically_unknown().cleared(
+                dataset_id=None,
+                family=None,
+                platform=None,
+                bands=None,
+                band_family=BandFamily.UNKNOWN,
+                interval=None,
+                source_ids=(),
+            )
+        return merge_states(state, other.state)
+
     def _apply_add_bands(
         self,
         state: ImageState,
@@ -680,21 +813,25 @@ class Analyzer:
     def _apply_normalized_difference(
         self, state: ImageState, positional: list[Value], node: ast.Call
     ) -> ImageState:
-        bands: tuple[str, ...] | None = None
+        # Per-argument possibilities: one name per argument for an ordinary
+        # literal pair, or a finite alternative set proven from merged branches.
+        arguments: tuple[tuple[str, ...], ...] | None = None
         if positional:
             candidate = _as_string_sequence(positional[0])
             if candidate is not None and len(candidate) == 2:
-                bands = candidate
+                arguments = tuple((name,) for name in candidate)
+            elif isinstance(positional[0], SequenceValue) and len(positional[0].elements) == 2:
+                arguments = _band_argument_alternatives(list(positional[0].elements))
         elif state.bands is not None and len(state.bands) == 2:
             # Immediately known two-band receiver selection (SPECIFICATION §10.1).
-            bands = state.bands
+            arguments = tuple((name,) for name in state.bands)
 
         line, column = _pos(node)
         self._operation_checks.add(("normalized_difference", line, column))
-        if state.family == catalog.FAMILY_LANDSAT_C2_L2 and bands is None:
+        if state.family == catalog.FAMILY_LANDSAT_C2_L2 and arguments is None:
             self._unresolved_lineage.add((line, column))
 
-        self._record(landsat_rules.check_normalized_difference(state, bands, line, column))
+        self._record(landsat_rules.check_normalized_difference(state, arguments, line, column))
 
         return state.numerically_unknown().cleared(bands=None, band_family=BandFamily.UNKNOWN)
 

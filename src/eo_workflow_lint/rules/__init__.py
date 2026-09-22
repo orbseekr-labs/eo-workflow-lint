@@ -76,8 +76,9 @@ RULES: tuple[RuleMeta, ...] = (
             "the two normalized-difference inputs are Landsat SR bands",
             "the relevant SR state is RAW",
             "the operation is normalizedDifference()",
-            "the two input bands are statically known from the explicit argument "
-            "or from an immediately known two-band receiver selection",
+            "the two input bands are statically known from the explicit argument, "
+            "from an immediately known two-band receiver selection, or as a finite set "
+            "of branch alternatives in which every candidate pair is a proven SR pair",
         ),
         non_triggers=(
             "SR scaling is proven correct and overwritten/applied before the operation",
@@ -131,7 +132,8 @@ RULES: tuple[RuleMeta, ...] = (
             "the two inputs are SR bands",
             "SR scaling state is CORRECTLY_SCALED",
             "operation is normalizedDifference()",
-            "the relevant band identities are statically known",
+            "the relevant band identities are statically known, directly or as a "
+            "finite set of branch alternatives that are all proven SR pairs",
         ),
         non_triggers=(
             "RAW Landsat SR; EWL201 covers that case",

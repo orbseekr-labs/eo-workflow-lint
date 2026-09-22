@@ -1,10 +1,10 @@
 """eo-workflow-lint: deterministic, offline static analyzer for Google Earth Engine
 Python workflows.
 
-Implements SPECIFICATION.md v0.1.1 (FROZEN).
+Implements SPECIFICATION.md v0.2.0 (FROZEN).
 """
 
 __all__ = ["SCHEMA_VERSION", "__version__"]
 
-__version__ = "0.1.2"
-SCHEMA_VERSION = "0.1"
+__version__ = "0.2.0"
+SCHEMA_VERSION = "0.2"

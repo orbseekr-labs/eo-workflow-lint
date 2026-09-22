@@ -49,15 +49,21 @@ class Finding:
     source_ids: tuple[str, ...]
     evidence: tuple[tuple[str, Any], ...]
 
+    @staticmethod
+    def _widen(value: Any) -> Any:
+        """Widen nested tuples back to lists for JSON rendering."""
+        if isinstance(value, tuple):
+            return [Finding._widen(item) for item in value]
+        return value
+
     def evidence_dict(self) -> dict[str, Any]:
         """Evidence as a JSON-ready mapping.
 
-        Evidence is stored as a hashable tuple of pairs so that findings can be
-        de-duplicated; sequence values are widened back to lists here.
+        Evidence is stored as hashable tuples so that findings can be
+        de-duplicated; sequence values are widened back to lists here, including
+        the nested lists of the ``band_argument_alternatives`` field.
         """
-        return {
-            key: list(value) if isinstance(value, tuple) else value for key, value in self.evidence
-        }
+        return {key: self._widen(value) for key, value in self.evidence}
 
     @property
     def sort_key(self) -> tuple[int, int, int, str, str]:

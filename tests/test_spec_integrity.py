@@ -8,7 +8,7 @@ Markdown, and this test is the backstop for any other tool that tries.
 If the specification owner deliberately revises the specification, this test is
 expected to fail loudly and the recorded digest must be updated as part of that
 authorised change, together with an entry in the specification's Revision
-history (v0.1.1: EWL203 message template and remediation guidance).
+history (v0.2.0: coverage hardening; v0.1.1: EWL203 remediation).
 """
 
 from __future__ import annotations
@@ -22,8 +22,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SPECIFICATION = REPO_ROOT / "SPECIFICATION.md"
 
 #: SHA-256 of the FROZEN specification. v0.1.0 was recorded at independent
-#: review; v0.1.1 records the authorised EWL203 revision of 2026-09-22.
-FROZEN_SHA256 = "baea0a78cc893180322f9fe3b62ee2b12188acc47fee33465fdec60bba5db303"
+#: review; v0.1.1 recorded the authorised EWL203 revision, and v0.2.0 records
+#: the authorised coverage-hardening revision, both of 2026-09-22.
+FROZEN_SHA256 = "cdf72ca8e6795a9eb0b4dd66b608823ab1af700f38e615950fb28dbe95540c9a"
 
 
 def _require_specification() -> Path:

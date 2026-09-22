@@ -1,9 +1,9 @@
-# eo-workflow-lint Specification v0.1.1
+# eo-workflow-lint Specification v0.2.0
 
 **Status:** FROZEN  
-**Specification version:** 0.1.1  
-**Freeze date:** 2026-08-19 (JST)  
-**Last authorised revision:** 2026-09-22 (JST), see Revision history  
+**Specification version:** 0.2.0  
+**Freeze date:** 2026-09-22 (JST)  
+**Supersedes:** 0.1.1 (frozen 2026-08-19; preserved at git tag `v0.1.2`)  
 **Project:** OrbSeekr Labs Project #002  
 **License target:** Apache-2.0  
 **Implementation target:** Python 3.11+
@@ -18,6 +18,7 @@
 |---|---|---|
 | 0.1.0 | 2026-08-19 | Initial freeze. |
 | 0.1.1 | 2026-09-22 | EWL203 message template and remediation guidance (§10.3, §16, Appendix A.3); §15 example tool_version aligned to 0.1.1. No change to any trigger, non-trigger, severity, reason-code meaning, source fact, evidence field, exit code, or JSON field. |
+| 0.2.0 | 2026-09-22 | Coverage hardening. Five static-analysis changes (§8.3, §8.5, §8.7, §8.9, §8.10, §9.4) let the existing rules resolve lineage in workflow shapes they previously could not prove. Adds the `band_argument_alternatives` evidence field (§10.1, §10.3) and raises `schema_version` to 0.2. No new reason code, no severity change, no change to any rule's meaning. |
 
 Every revision MUST be recorded here and MUST be accompanied by an update to the frozen digest recorded in the conformance test suite.
 
@@ -195,7 +196,7 @@ Distinct findings MAY share the same reason code.
 
 The initial v0.1.0 static catalog version MUST be:
 
-`2026-08-19.1`
+`2026-09-22.1`
 
 Catalog facts MUST be bundled with the package and MUST NOT be refreshed at runtime.
 
@@ -382,6 +383,27 @@ The analyzer MUST resolve numeric constants assigned to a simple name when unamb
 
 Reassignment with conflicting values MUST invalidate the constant binding for subsequent use unless ordinary lexical statement order proves a single current value.
 
+#### 8.3.1 Module-scope binding visibility (v0.2.0)
+
+When the analyzer inspects a function body, module-level bindings MUST be visible inside that body, subject to all of the following:
+
+1. only bindings that cannot themselves carry dataset lineage MAY be seeded: user-defined functions, lambdas, module references, and statically resolved constants;
+2. an image or image-collection binding MUST NOT be seeded, because a module-level image reaching a function body is not proof that it is the value in use there;
+3. a module-level name bound by more than one top-level statement MUST NOT be seeded, because selecting one of the bindings would be a guess about execution order (§8.1);
+4. function parameters MUST shadow seeded bindings, and any assignment inside the body MUST override them.
+
+This exists so that the common shape below resolves. It changes which facts can be proven; it does not change any rule's trigger.
+
+```python
+def apply_scale_factors(image):
+    optical = image.select("SR_B.").multiply(0.0000275).add(-0.2)
+    return image.addBands(optical, None, True)
+
+def process(region):
+    collection = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").map(apply_scale_factors)
+    return collection.map(lambda image: image.normalizedDifference(["SR_B5", "SR_B4"]))
+```
+
 ### 8.4 Simple aliases
 
 The analyzer MUST propagate state through direct assignments:
@@ -407,6 +429,24 @@ The following operations SHOULD preserve recognized dataset lineage when their u
 
 An implementation MAY support additional pass-through methods only if doing so cannot create false positive scientific findings.
 
+#### 8.5.1 `median()` (v0.2.0)
+
+`ImageCollection.median()` MUST preserve the abstract state of the collection element.
+
+Justification, which is normative for why no other reducer is included: the documented Collection 2 transforms are increasing affine maps `y = a·x + b` with `a > 0`, and the per-pixel median is equivariant under such maps, so `median(scale(x)) == scale(median(x))` and a proven scale state remains true of the composite. `ImageCollection.median()` also preserves input band names.
+
+`reduce(ee.Reducer.median())` MUST NOT be treated this way: it renames output bands (for example `SR_B5_median`), so band identity is no longer proven.
+
+`mean()`, `min()`, `max()`, and every other reducer remain unknown-producing in v0.2.0 even where the same algebraic argument would hold.
+
+#### 8.5.2 `merge()` (v0.2.0)
+
+`ImageCollection.merge(other)` MUST preserve state only when both sides are proven image collections of the same proven product family.
+
+In that case each property is kept only where the two sides agree, and any property on which they differ MUST become unknown; in particular a differing dataset identity or platform MUST become unknown while a shared family, scale state, and numeric domain are retained.
+
+If the argument is not a proven collection, or the two families differ or are unproven, the result MUST carry no usable lineage.
+
 ### 8.6 Unknown-producing operations
 
 Unrecognized arithmetic or nonlinear operations MUST conservatively set the affected numeric-domain/scale state to `UNKNOWN` when preserving the old state could create a false positive.
@@ -423,7 +463,11 @@ Supported selectors include:
 - a literal list or tuple of strings;
 - a statically resolved constant string/list/tuple.
 
-Regex semantics do not need to be fully interpreted in v0.1.0. The exact pattern `SR_B.` MAY be recognized as the Landsat SR family for the scaling idiom described below.
+Regex semantics do not need to be fully interpreted. The exact pattern `SR_B.` MAY be recognized as the Landsat SR family for the scaling idiom described below.
+
+From v0.2.0 the exact pattern `ST_B.*` MUST likewise be recognized as the Landsat surface-temperature *family*. It names no concrete band, so it MUST NOT establish a `CORRECTLY_SCALED` ST state (§9.2), and the selected band list MUST remain unknown.
+
+No other regex-like selector is interpreted. In particular `SR_B.*` is NOT recognized in v0.2.0, and a selection using it leaves the band family unproven.
 
 ### 8.8 `filterDate()` semantics
 
@@ -468,11 +512,28 @@ collection.map(lambda image: image.select("VV"))
 
 ### 8.10 Control flow
 
-v0.1.0 does not require path-sensitive symbolic execution.
+v0.2.0 does not require path-sensitive symbolic execution.
 
 When multiple control-flow branches yield incompatible abstract states, the merged state MUST become `UNKNOWN` for the conflicting property.
 
 This rule exists to reduce false positives.
+
+#### 8.10.1 Finite string alternatives (v0.2.0)
+
+As a bounded exception, when every branch binds a name to a statically proven **string** constant, the merged binding MUST retain the finite set of those strings instead of degrading to `UNKNOWN`.
+
+Constraints:
+
+1. the alternatives are strings only, and MUST NOT participate in arithmetic, scale-constant resolution, dataset identification, or any other numeric or lineage reasoning;
+2. a rule that consumes them MUST evaluate every candidate reading and MUST emit a finding only if *all* of them satisfy its trigger;
+3. the number of candidate readings at the consuming call MUST NOT exceed **four**; beyond that the value MUST degrade to `UNKNOWN`;
+4. if any branch value is unknown or is not a string, the merged binding MUST degrade to `UNKNOWN`.
+
+Because branch correlation between separate names is not tracked, the candidate readings at a two-argument call are the cartesian product of each argument's alternatives. That product is a sound over-approximation of the reachable readings: requirement 2 therefore makes the resulting finding harder, never easier, to emit.
+
+For the same reason a finding MUST NOT report candidate *pairs* as evidence, because the analyzer cannot prove that a given pair is reachable. Evidence MUST instead report the possibilities per argument (§10.1, §10.3).
+
+This is a narrow provision for band names chosen per platform; it is not general symbolic execution.
 
 ---
 
@@ -521,6 +582,10 @@ image.addBands(optical, overwrite=True)
 
 If overwrite is not statically proven true, the original band's scale state MUST NOT be replaced.
 
+From v0.2.0, when the overwrite *is* statically proven and the written bands are a proven single band family, only that family's scale state MUST be updated. Writing a proven surface-temperature selection back MUST NOT erase an already-proven surface-reflectance scale state, and the converse MUST also hold.
+
+If the written selection's family is unknown or mixed, both scale states MUST still be invalidated.
+
 ### 9.5 Unsupported custom scaling
 
 Arbitrary user-defined helper functions that happen to perform equivalent scaling are not required to be recognized unless their body is analyzable under the same local rules.
@@ -548,7 +613,7 @@ Emit EWL201 only if all are proven:
 2. the two normalized-difference inputs are Landsat SR bands;
 3. the relevant SR state is `RAW`;
 4. the operation is `ee.Image.normalizedDifference()` or method-equivalent `image.normalizedDifference()`;
-5. the two input bands are statically known either from the explicit argument or from an immediately known two-band receiver selection.
+5. the two input bands are statically known either from the explicit argument, from an immediately known two-band receiver selection, or as a finite set of branch alternatives in which **every** candidate pair is a proven two-band SR pair (§8.10.1).
 
 ### Non-triggers
 
@@ -568,8 +633,12 @@ MUST NOT emit EWL201 when:
 ### Evidence fields
 
 - `dataset_id`
-- `bands`
+- exactly one of:
+  - `bands` — the single proven two-band input, as `[first, second]`, or
+  - `band_argument_alternatives` — the possibilities proven per argument under §8.10.1: element 0 is the deterministically sorted set of names the first `normalizedDifference()` argument could take, element 1 the same for the second argument. It MUST NOT be read as a list of correlated pairs, and the number of cross-product readings it implies MUST NOT exceed four
 - `sr_scale_state`
+
+An implementation MUST NOT emit both `bands` and `band_argument_alternatives` for the same finding: the evidence states exactly what was proven, and nothing more.
 
 ---
 
@@ -635,7 +704,7 @@ Emit only if all are proven:
 2. the two inputs are SR bands;
 3. SR scaling state is `CORRECTLY_SCALED`;
 4. operation is `normalizedDifference()`;
-5. the relevant band identities are statically known.
+5. the relevant band identities are statically known, either directly or as a finite set of branch alternatives in which **every** candidate pair is a proven two-band SR pair (§8.10.1).
 
 ### Non-triggers
 
@@ -674,8 +743,12 @@ Text output for a finding whose rule carries remediation guidance SHOULD render 
 ### Evidence fields
 
 - `dataset_id`
-- `bands`
+- exactly one of:
+  - `bands` — the single proven two-band input, as `[first, second]`, or
+  - `band_argument_alternatives` — the possibilities proven per argument under §8.10.1: element 0 is the deterministically sorted set of names the first `normalizedDifference()` argument could take, element 1 the same for the second argument. It MUST NOT be read as a list of correlated pairs, and the number of cross-product readings it implies MUST NOT exceed four
 - `sr_scale_state`
+
+An implementation MUST NOT emit both `bands` and `band_argument_alternatives` for the same finding: the evidence states exactly what was proven, and nothing more.
 
 ---
 
@@ -975,8 +1048,8 @@ The conceptual v0.1.0 JSON shape is:
 
 ```json
 {
-  "schema_version": "0.1",
-  "tool_version": "0.1.1",
+  "schema_version": "0.2",
+  "tool_version": "0.2.0",
   "catalog_version": "2026-08-19.1",
   "input": {
     "sha256": "<64 lowercase hex chars>",
@@ -1217,6 +1290,16 @@ Message and remediation (v0.1.1):
 - the JSON finding object is unchanged;
 - the Appendix A.3 guarded expression produces no finding.
 
+### 21.4.1 v0.2.0 coverage-hardening tests
+
+Every change in §8.3.1, §8.5.1, §8.5.2, §8.7, §8.10.1 and §9.4 MUST be covered by a minimal fixture tested in three states:
+
+- correctly scaled SR input => EWL203;
+- raw SR input => EWL201;
+- unresolved or ambiguous state => neither.
+
+Conservative fallbacks MUST also be tested explicitly: a shadowing parameter, a local reassignment, a rebound module name, a module-level image binding, an unknown or mixed overwrite family, `reduce(ee.Reducer.median())` and other reducers, `merge()` across families or with an unproven argument, a non-SR or unknown branch alternative, and a candidate set exceeding the four-reading cap.
+
 ### 21.5 EWL301 tests
 
 Positive:
@@ -1332,7 +1415,7 @@ Removed or deprecated future reason codes MUST remain reserved once publicly rel
 
 The implementation team MAY choose internal module names and class structure.
 
-The implementation team MUST NOT change:
+Outside an authorised specification revision recorded in the Revision history, the implementation team MUST NOT change:
 
 - supported scope;
 - verdict semantics;
@@ -1395,7 +1478,7 @@ Candidates only; none are authorized for v0.1.0 implementation:
 
 ## 28. Freeze declaration
 
-This specification is **FROZEN for v0.1.x implementation**. Changes are permitted only through an authorised revision recorded in the Revision history.
+This specification is **FROZEN for v0.2.x implementation**. Changes are permitted only through an authorised revision recorded in the Revision history. The v0.1.x specification remains preserved in git history at tag `v0.1.2`.
 
 The implementation task is to implement this specification, not redesign it.
 
