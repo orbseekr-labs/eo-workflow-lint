@@ -1,9 +1,9 @@
-# eo-workflow-lint Specification v0.2.0
+# eo-workflow-lint Specification v0.2.1
 
 **Status:** FROZEN  
-**Specification version:** 0.2.0  
-**Freeze date:** 2026-09-22 (JST)  
-**Supersedes:** 0.1.1 (frozen 2026-08-19; preserved at git tag `v0.1.2`)  
+**Specification version:** 0.2.1  
+**Freeze date:** 2026-09-22 (JST); revised 2026-09-28 (JST)  
+**Supersedes:** 0.2.0 (frozen 2026-09-22; preserved at git tag `v0.2.0`), which superseded 0.1.1 (preserved at git tag `v0.1.2`)  
 **Project:** OrbSeekr Labs Project #002  
 **License target:** Apache-2.0  
 **Implementation target:** Python 3.11+
@@ -19,6 +19,7 @@
 | 0.1.0 | 2026-08-19 | Initial freeze. |
 | 0.1.1 | 2026-09-22 | EWL203 message template and remediation guidance (§10.3, §16, Appendix A.3); §15 example tool_version aligned to 0.1.1. No change to any trigger, non-trigger, severity, reason-code meaning, source fact, evidence field, exit code, or JSON field. |
 | 0.2.0 | 2026-09-22 | Coverage hardening. Five static-analysis changes (§8.3, §8.5, §8.7, §8.9, §8.10, §9.4) let the existing rules resolve lineage in workflow shapes they previously could not prove. Adds the `band_argument_alternatives` evidence field (§10.1, §10.3) and raises `schema_version` to 0.2. No new reason code, no severity change, no change to any rule's meaning. |
+| 0.2.1 | 2026-09-28 | Documentation authority correction; no rule changes; no severity changes; no trigger changes; no output semantic changes. §0 now names the version this document governs and states how the historical `v0.1.0` wording in the body is to be read; §6.1 and the §15 conceptual example state the catalog/tool versions actually in force; §28 records where 0.2.0 is preserved. One conformance clarification is also recorded: §10.5 states explicitly that argument unpacking (`*`/`**`) cannot prove the absence of `scale`/`crsTransform`, which is the existing §8.1 conservative proof rule applied to EWL401; it corrects an implementation false positive found by real-world validation and does not change what EWL401 is defined to detect. `schema_version` remains 0.2 and every JSON field is unchanged. |
 
 Every revision MUST be recorded here and MUST be accompanied by an update to the frozen digest recorded in the conformance test suite.
 
@@ -26,7 +27,9 @@ Every revision MUST be recorded here and MUST be accompanied by an update to the
 
 ## 0. Specification authority
 
-This document is the normative specification for `eo-workflow-lint` v0.1.0.
+This document is the normative specification for `eo-workflow-lint` v0.2.x. Its specification version is 0.2.1, and it governs tool version 0.2.1 and later 0.2.x releases until superseded by a revision recorded in the Revision history.
+
+Many clauses in this document name `v0.1.0` (for example "What v0.1.0 is", "v0.1.0 MUST NOT …", "not v0.1.0 rules"). Those clauses define the product scope, rule set, and contract first frozen in v0.1.0; they remain normative for v0.2.x exactly as written, as amended by the later revisions recorded in the Revision history. Where such a clause and a clause marked for a later version (for example "(v0.2.0)") disagree, the later clause governs. The reason-code registry is unchanged since v0.1.0 (§24).
 
 Implementation MUST conform to this document. An implementer MUST NOT invent additional scientific rules, silently broaden detection, infer undocumented Earth-observation semantics, or change verdict semantics without a specification revision.
 
@@ -194,7 +197,7 @@ Distinct findings MAY share the same reason code.
 
 ### 6.1 Catalog identity
 
-The initial v0.1.0 static catalog version MUST be:
+The static catalog version for this specification MUST be (it was `2026-08-19.1` in v0.1.x):
 
 `2026-09-22.1`
 
@@ -832,6 +835,10 @@ These suppress the finding:
 
 The expression does not need to resolve numerically. The rule checks explicitness, not whether the chosen value is scientifically optimal.
 
+### Argument unpacking
+
+If the call passes any `**mapping` keyword unpacking or any `*sequence` positional unpacking, the analyzer cannot prove that `scale` and `crsTransform` are absent, so EWL401 MUST NOT be emitted for that call (§8.1). This holds whether or not the unpacked value is statically resolvable. The call is still counted as a supported operation check.
+
 ### Positional rules
 
 For `reduceRegion(reducer, geometry, scale, crs, crsTransform, ...)`:
@@ -1049,8 +1056,8 @@ The conceptual v0.1.0 JSON shape is:
 ```json
 {
   "schema_version": "0.2",
-  "tool_version": "0.2.0",
-  "catalog_version": "2026-08-19.1",
+  "tool_version": "0.2.1",
+  "catalog_version": "2026-09-22.1",
   "input": {
     "sha256": "<64 lowercase hex chars>",
     "byte_length": 1234
@@ -1478,7 +1485,7 @@ Candidates only; none are authorized for v0.1.0 implementation:
 
 ## 28. Freeze declaration
 
-This specification is **FROZEN for v0.2.x implementation**. Changes are permitted only through an authorised revision recorded in the Revision history. The v0.1.x specification remains preserved in git history at tag `v0.1.2`.
+This specification is **FROZEN for v0.2.x implementation**. Changes are permitted only through an authorised revision recorded in the Revision history. The v0.1.x specification remains preserved in git history at tag `v0.1.2`, and specification 0.2.0 at tag `v0.2.0`.
 
 The implementation task is to implement this specification, not redesign it.
 

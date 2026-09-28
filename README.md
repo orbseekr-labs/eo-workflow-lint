@@ -12,9 +12,12 @@ documented availability gap.
 It is a linter, not an assistant. It never runs your code, never contacts a network, and never
 needs Earth Engine credentials.
 
-- Version: **0.2.0**
-- Specification: [`SPECIFICATION.md`](SPECIFICATION.md) (frozen for the 0.1.x series)
+- Version: **0.2.1**
+- Specification: [`SPECIFICATION.md`](SPECIFICATION.md) v0.2.1 (frozen for the 0.2.x series)
+- JSON report `schema_version`: `0.2`
 - Catalog version: `2026-09-22.1`
+- Reason codes: 7 (unchanged since v0.1.0)
+- Real-world validation: [`docs/real-world-validation.md`](docs/real-world-validation.md)
 - Python: 3.11+
 - Runtime dependencies: none (standard library only)
 - License: Apache-2.0
@@ -22,7 +25,7 @@ needs Earth Engine credentials.
 ## What PASS means
 
 > `eo-workflow-lint` detects only a narrow set of documented Earth-observation workflow
-> anti-patterns. **PASS** means that no supported v0.1.0 rule produced a finding in the
+> anti-patterns. **PASS** means that no supported rule produced a finding in the
 > statically resolved portion of the source. PASS does **not** prove that the workflow,
 > analysis, model, or conclusion is scientifically correct.
 
@@ -34,10 +37,12 @@ into a scientific verdict — there is no `UNKNOWN` verdict.
 
 Python 3.11 or newer. `eo-workflow-lint` has no runtime dependencies.
 
-**Install the released version directly from GitHub:**
+**Install a tagged release directly from GitHub** (tags are listed on the
+[Releases](https://github.com/orbseekr-labs/eo-workflow-lint/releases) page; this README
+describes v0.2.1):
 
 ```bash
-pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.2.0"
+pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.2.1"
 ```
 
 **Or install from a local clone**, which you will want if you intend to run the tests or read the
@@ -58,7 +63,7 @@ eo-workflow-lint check workflow.py
 eo-workflow-lint check workflow.py --format json
 eo-workflow-lint check workflow.py --fail-on conditional
 
-eo-workflow-lint rules              # list the v0.1.0 reason codes
+eo-workflow-lint rules              # list the reason codes
 eo-workflow-lint explain EWL301     # explain one reason code
 eo-workflow-lint sources            # show the bundled catalog source registry
 eo-workflow-lint --version
@@ -103,7 +108,7 @@ coverage: 1 recognized dataset, 1 supported operation check, 0 unresolved lineag
 | `EWL202` | FAIL | `LANDSAT_C2_BAND_SCALE_MISMATCH` | The documented SR scale/offset pair applied to a proven ST band, or the ST pair applied to proven SR bands |
 | `EWL203` | CONDITIONAL | `NORMALIZED_DIFFERENCE_NEGATIVE_MASK_RISK` | Correctly scaled Landsat SR passed to `normalizedDifference()`, which masks output pixels when either input is negative — a workflow choice that should be explicit (see below) |
 | `EWL301` | FAIL | `SENTINEL1_GRD_REDUNDANT_DB_CONVERSION` | A second explicit `10*log10()` conversion on `COPERNICUS/S1_GRD`, which is already in dB |
-| `EWL401` | CONDITIONAL | `ANALYSIS_SCALE_UNSPECIFIED` | `reduceRegion()` / `reduceRegions()` with neither `scale` nor `crsTransform` explicitly supplied |
+| `EWL401` | CONDITIONAL | `ANALYSIS_SCALE_UNSPECIFIED` | `reduceRegion()` / `reduceRegions()` with neither `scale` nor `crsTransform` explicitly supplied (a call using `*`/`**` argument unpacking is not flagged, because the omission cannot be proven) |
 | `EWL501` | FAIL | `SENTINEL2_QA60_UNAVAILABLE` | `QA60` use whose entire known interval falls inside the documented QA60 gap |
 | `EWL502` | CONDITIONAL | `SENTINEL2_QA60_GAP_OVERLAP` | `QA60` use across an interval that overlaps, but is not contained by, the QA60 gap |
 
@@ -168,7 +173,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: orbseekr-labs/eo-workflow-lint@v0.2.0
+      - uses: orbseekr-labs/eo-workflow-lint@v0.2.1
         with:
           fail-on: conditional
 ```
@@ -185,7 +190,7 @@ anywhere.
 | `paths` | `*.py` | Newline-separated Git pathspecs; only `.py` matches are analyzed |
 
 ```yaml
-      - uses: orbseekr-labs/eo-workflow-lint@v0.2.0
+      - uses: orbseekr-labs/eo-workflow-lint@v0.2.1
         with:
           fail-on: conditional
           paths: |
@@ -201,7 +206,7 @@ the same distinction the CLI makes. Outputs: `verdict`, `files-checked`, `findin
 ## Other CI systems
 
 ```bash
-pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.2.0"
+pip install "git+https://github.com/orbseekr-labs/eo-workflow-lint.git@v0.2.1"
 git ls-files -z -- '*.py' | xargs -0 -n1 eo-workflow-lint check --fail-on conditional
 ```
 
@@ -217,7 +222,7 @@ eo-workflow-lint check workflow.py --format json > report.json
 ```json
 {
   "schema_version": "0.2",
-  "tool_version": "0.2.0",
+  "tool_version": "0.2.1",
   "catalog_version": "2026-09-22.1",
   "input": { "sha256": "…", "byte_length": 1234 },
   "verdict": "FAIL",
@@ -254,7 +259,7 @@ so identical input bytes produce byte-identical output on any machine.
 
 Every finding carries the source IDs it rests on. The bundled catalog is frozen at version
 `2026-09-22.1` and is never refreshed at runtime; `eo-workflow-lint sources` prints the full
-registry with titles, URLs, and the specific facts v0.1.0 relies on:
+registry with titles, URLs, and the specific facts the rules rely on:
 
 `SRC-USGS-LANDSAT-C2-SCALE`, `SRC-GEE-LANDSAT-C1-C2`, `SRC-GEE-NORMALIZED-DIFFERENCE`,
 `SRC-GEE-S1-GRD`, `SRC-GEE-REDUCE-REGION`, `SRC-GEE-REDUCE-REGIONS`, `SRC-GEE-S2-HARMONIZED`,
@@ -271,7 +276,7 @@ registry with titles, URLs, and the specific facts v0.1.0 relies on:
 
 ## Limitations
 
-`eo-workflow-lint` v0.1.0 is deliberately narrow. It does **not**:
+`eo-workflow-lint` 0.2.x is deliberately narrow. It does **not**:
 
 - execute, import, or authenticate anything;
 - analyze JavaScript, or read Jupyter notebook JSON directly;
@@ -286,22 +291,48 @@ scale state, or temporal scope cannot be proven, the relevant rule does not fire
 counter is incremented instead. Preferring a missed finding over a false one is a deliberate
 product decision.
 
-The following are explicitly **not** v0.1.0 rules: Sentinel-2 Processing Baseline 04.00 DN
-shift, mixed Sentinel-2 native resolutions, TOA-versus-surface-reflectance mixing, Sentinel-1
-ascending/descending or polarization mixing, and Landsat Collection 1 QA bitmasks ported to
-Collection 2. See `SPECIFICATION.md` §11 for why each was excluded.
+The following were excluded in v0.1.0 and are still **not** rules: Sentinel-2 Processing
+Baseline 04.00 DN shift, mixed Sentinel-2 native resolutions, TOA-versus-surface-reflectance
+mixing, Sentinel-1 ascending/descending or polarization mixing, and Landsat Collection 1 QA
+bitmasks ported to Collection 2. See `SPECIFICATION.md` §11 for why each was excluded.
+
+## Real-world validation
+
+The rules are checked against pinned public Earth Engine repositories, not only synthetic
+fixtures. [`docs/real-world-validation.md`](docs/real-world-validation.md) lists every
+repository, commit, file and line, the human-reviewed expectation, and the v0.1.2 and current
+results. In summary (2026-09-28): of the 8 human-verified EWL203 candidate repositories from
+the original benchmark, v0.1.2 detected 0 and v0.2.1 detects 4 (the other 4 need
+interprocedural or cross-module lineage, which is out of scope); expert negative controls
+produce no false positives after the v0.2.1 EWL401 fix. There is no accuracy percentage: the
+sample is small and was not drawn at random.
+
+The benchmark manifest is [`validation/manifest.json`](validation/manifest.json). It stores
+only repository URLs, commit SHAs, paths, lines and file digests — never third-party source.
+Re-running it needs network access and is a manual developer command, not part of the test
+suite:
+
+```bash
+python validation/run_benchmark.py                     # fetch pinned files, run the linter
+python validation/run_benchmark.py --linter /path/to/other/eo-workflow-lint  # e.g. v0.1.2
+```
 
 ## Development
 
 ```bash
 pip install -e ".[dev]"
-pytest -q
+pytest
 ruff check .
+ruff format --check .
+python -m build
 ```
 
-The specification is frozen for the 0.1.x series: an implementation must not change verdict
+The test suite is offline. The version is defined once, in `src/eo_workflow_lint/__init__.py`.
+
+The specification is frozen for the 0.2.x series: an implementation must not change verdict
 semantics, reason-code meanings, thresholds, catalog constants, or the JSON report contract
-within 0.1.x.
+without an authorised specification revision recorded in its Revision history (and the
+frozen digest in `tests/test_spec_integrity.py`).
 
 ---
 

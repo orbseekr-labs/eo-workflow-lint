@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eo-workflow-lint"
-version = "0.2.0"
+dynamic = ["version"]
 description = "A deterministic, offline static analyzer for scientifically unsafe Earth observation workflows."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -31,7 +31,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: GIS",
     "Topic :: Software Development :: Quality Assurance",
 ]
-# The v0.1.0 runtime uses only the Python standard library (SPECIFICATION §20).
+# The runtime uses only the Python standard library (SPECIFICATION §20).
 dependencies = []
 
 [project.optional-dependencies]
@@ -39,6 +39,10 @@ dev = ["pytest>=8", "ruff>=0.5", "pyyaml>=6"]
 
 [project.scripts]
 eo-workflow-lint = "eo_workflow_lint.cli:run"
+
+# Single source of truth for the version: eo_workflow_lint.__version__.
+[tool.setuptools.dynamic]
+version = { attr = "eo_workflow_lint.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
