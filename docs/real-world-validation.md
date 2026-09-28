@@ -220,6 +220,11 @@ exactly those gaps.
 
 - **Small, targeted sample.** 10 candidate cases and 5 expert repositories do not
   support a detection-rate or precision estimate. We deliberately report no percentage.
+- **Not a held-out set.** The 8 original candidates are a development and regression set, not an independent held-out test:
+  - The v0.2.0 lineage-coverage work was developed against them. For example, v0.2.0 was the first version to detect `nlebovits/gee-urban-clim` `src/heat/utils.py`.
+  - The project also opened questions about the suspected pattern on several candidate repositories before and after that release (e.g. `nlebovits/gee-urban-clim#9`, `AS-youKnow/urban-heat-stress#1`/`#2`, `Yingjie4Science/SNAPP#7`, `FaranIdo/stpred#3`, `Ojas-Rohatgi/Deforestation-Detection#1`, `SylviaChebetEMTH/Crop-Analysis#1`, `kaust-halo/geeet#38`).
+  - The "0/8 → 4/8" change therefore shows improved coverage on known cases, not generalisation.
+  - The official-sample sweep (868 files), added on 2026-09-28, was not used during development.
 - **Review is internal.** Candidate labels were made within the project: an initial
   review (2026-09-22) and an independent re-review of every target line (2026-09-28), both
   AI-assisted and maintainer-directed. The repository authors have not confirmed them.
