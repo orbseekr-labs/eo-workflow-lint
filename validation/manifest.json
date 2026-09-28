@@ -1,0 +1,300 @@
+{
+  "manifest_version": 1,
+  "description": "Pinned real-world validation benchmark for eo-workflow-lint. Stores repository names, commit SHAs, paths, line numbers and SHA-256 digests only; no third-party source code. See docs/real-world-validation.md for methodology.",
+  "original_benchmark_date": "2026-09-22",
+  "last_validated": "2026-09-28",
+  "line_convention": "line = the line eo-workflow-lint reports for the finding, i.e. the first line of the call expression (ast lineno).",
+  "cases": [
+    {
+      "id": "gee-urban-clim",
+      "group": "original-2026-09-22",
+      "role": "candidate",
+      "repo": "nlebovits/gee-urban-clim",
+      "commit": "c845a45ca517d1a4ea5ee186cff9751e5a03f6f8",
+      "files": [
+        {
+          "path": "src/heat/utils.py",
+          "sha256": "a7c61844d9949b8b59f7f2e4d023cd7ed6a3d25dff43344d51e95f8655966f81",
+          "expected": [
+            {"code": "EWL203", "line": 70, "static_scope": "in"},
+            {"code": "EWL203", "line": 143, "static_scope": "in"}
+          ]
+        }
+      ],
+      "sweep": {"include": ["**.py"]},
+      "human_review_note": "LANDSAT/LC08/C02/T1_L2 (lines 62, 136) is mapped through the module-level apply_scale_factors (lines 39-42: SR_B. x0.0000275-0.2, ST_B.* x0.00341802+149, both overwritten) and cloud_mask; normalizedDifference([SR_B5, SR_B4]) is then called on the scaled SR inside calculate_lst (line 70) and a lambda (line 143) with no handling of negative inputs. NDVI feeds FV/emissivity/LST and NDVI min/max export."
+    },
+    {
+      "id": "deforestation-detection",
+      "group": "original-2026-09-22",
+      "role": "candidate",
+      "repo": "Ojas-Rohatgi/Deforestation-Detection",
+      "commit": "f7f474fb869267c6414c29ab92a9a6b2671ddb7c",
+      "files": [
+        {
+          "path": "backend.py",
+          "sha256": "ee49b11fbeae6647ee58f4a2944cc7cd878783484a7b308ad6e015257580db97",
+          "expected": [{"code": "EWL203", "line": 54, "static_scope": "in"}]
+        }
+      ],
+      "sweep": {"include": ["**.py"]},
+      "human_review_note": "Module-level apply_scale_factors (lines 40-43, SR_B. + ST_B.* overwrite) mapped over LANDSAT/LC08/C02/T1_L2 inside fetch_rgb_ndvi (lines 48-52); median().clip() composite (line 53); normalizedDifference([SR_B5, SR_B4]) on scaled SR at line 54 without negative-input handling; NDVI is a classifier input."
+    },
+    {
+      "id": "geeet",
+      "group": "original-2026-09-22",
+      "role": "candidate",
+      "repo": "kaust-halo/geeet",
+      "commit": "ae40313bd890adcac4c03b69eb7939fb154a2434",
+      "files": [
+        {
+          "path": "geeet/eepredefined/landsat.py",
+          "sha256": "afbd535d1e9633433c0acd21fb86aadac048a29cd09b6e19d3235fc1ae33df70",
+          "expected": [{"code": "EWL203", "line": 66, "static_scope": "in"}]
+        }
+      ],
+      "sweep": {"include": ["**.py"]},
+      "adjudicated_findings": [
+        {"path": "geeet/eepredefined/reducers.py", "code": "EWL401", "line": 28, "label": "false_positive", "note": "reduceRegions(collection=..., reducer=..., **reducer_kws): scale may be supplied through the caller's reducer_kws, so the omission is not provable (fixed in v0.2.1)"}
+      ],
+      "human_review_note": "collection() merges LE07/LC08/LC09 C2 L2 (line 280), maps scale_SR (lines 8-17: SR_B. + ST_B.* overwrite; line 303) then add_ndvi (line 306). add_ndvi selects the per-platform SR pair renamed to SR_B5/SR_B4 and calls normalizedDifference at lines 66-67 on scaled SR; the later clamp(-1,1) (line 69) does not address masking of negative inputs."
+    },
+    {
+      "id": "stpred",
+      "group": "original-2026-09-22",
+      "role": "candidate",
+      "repo": "FaranIdo/stpred",
+      "commit": "c31b7b8ea2f0e1e93a5fe8da00ca2510a6b07ff9",
+      "files": [
+        {
+          "path": "dataset/download_ee_data.py",
+          "sha256": "91a1623ed8f0b6e5c5cd3cdddaf621ebff2c7ab7a6be2ed56adbd3ad2dd1c38a",
+          "expected": [{"code": "EWL203", "line": 107, "static_scope": "in"}]
+        }
+      ],
+      "sweep": {"include": ["**.py"]},
+      "human_review_note": "process_period picks LC08/LE07/LT05 C2 L2 by year (lines 78-86), maps the nested apply_scale_factors (lines 93-95, SR_B. overwrite) and the nested calculate_ndvi whose band names are chosen per platform in an if/else (lines 98-105); normalizedDifference([nir, red]) on scaled SR at line 107, then a mean export. The module-level calculate_ndvi at line 63 is shadowed and never called on Landsat data, so it is not a target."
+    },
+    {
+      "id": "snapp",
+      "group": "original-2026-09-22",
+      "role": "candidate",
+      "repo": "Yingjie4Science/SNAPP",
+      "commit": "56edc73cd5bb6888844803d7bdfe11a7fb901f96",
+      "files": [
+        {
+          "path": "src/inputs/ndvi/ndvi_gee.py",
+          "sha256": "3ce1a0ae48c531cc44ae363a792c8febee66cade4c05943685eb70ff5d4a9884",
+          "expected": [
+            {"code": "EWL203", "line": 83, "static_scope": "out", "scope_gap": "dataset ID is a function parameter: ee.ImageCollection(coll_id) inside prep(coll_id, ...) (lines 94-97) reached through plain calls (lines 99-102); needs interprocedural analysis"},
+            {"code": "EWL203", "line": 87, "static_scope": "out", "scope_gap": "same as line 83"}
+          ]
+        }
+      ],
+      "sweep": {"include": ["**.py"]},
+      "human_review_note": "prep() maps apply_scale_factors (lines 61-64, SR_B. + ST_B.* overwrite) over LT05/LE07/LC08/LC09 C2 L2 (lines 99-102); add_ndvi_l57 (line 83) and add_ndvi_l89 (line 87) call normalizedDifference on scaled SR; merged NDVI feeds a yearly p90."
+    },
+    {
+      "id": "urban-heat-stress",
+      "group": "original-2026-09-22",
+      "role": "candidate",
+      "repo": "AS-youKnow/urban-heat-stress",
+      "commit": "72ef427ca4ff2614cf21597548761857c9a87b70",
+      "files": [
+        {
+          "path": "module1_data_ingestion.py",
+          "sha256": "3b9084733922bbb572cc37cbaef853ca527f1a83bef46a986e1663f5fc7bb170",
+          "expected": [
+            {"code": "EWL203", "line": 212, "static_scope": "out", "scope_gap": "dataset ID is a config attribute ee.ImageCollection(CFG.landsat) (line 172, defined in config.py:101) and the composite reaches compute_indices through a plain call (line 280); needs cross-module constant resolution and interprocedural analysis"},
+            {"code": "EWL203", "line": 215, "static_scope": "out", "scope_gap": "same as line 212"}
+          ]
+        }
+      ],
+      "sweep": {"include": ["**.py"]},
+      "human_review_note": "build_landsat_composite scales LANDSAT/LC08/C02/T1_L2 (config.py:101) with the nested apply_scale_factors (lines 161-169), selects SR_B4/SR_B5/SR_B6/ST_B10 and takes a median composite (line 189); compute_indices calls normalizedDifference for NDVI (line 212) and NDBI (line 215) on scaled SR."
+    },
+    {
+      "id": "rusle",
+      "group": "original-2026-09-22",
+      "role": "candidate",
+      "repo": "nriveras/RUSLE",
+      "commit": "3338daf5efd0717c3db4fcb299e8d21decafc179",
+      "files": [
+        {
+          "path": "00_scripts/rusle_utils.py",
+          "sha256": "6be7d259ec48743ec654f0ddce65385f0ec33634a3baab36383ddce91da7fd72",
+          "expected": [
+            {"code": "EWL203", "line": 443, "static_scope": "out", "scope_gap": "scaled collection is returned by load_landsat8() (lines 152-168) and enters calculate_c_factor as the parameter landsat (line 415); needs interprocedural return/parameter flow"}
+          ]
+        },
+        {
+          "path": "app/services/rusle_calculator.py",
+          "sha256": "44fe3106300a367105d4230605d84f48cd36706e6ed3b421f91247c06689a37e",
+          "expected": [
+            {"code": "EWL203", "line": 332, "static_scope": "out", "scope_gap": "scaled collection comes from gee_service.load_landsat8() in another module (line 323); needs cross-module analysis"}
+          ]
+        },
+        {
+          "path": "app/services/gee_service.py",
+          "sha256": "55106b89f7686d1048628fbd90ea2047a32864a0ce359c27fe602d6ac5a448b8",
+          "expected": []
+        }
+      ],
+      "sweep": {"include": ["**.py"]},
+      "human_review_note": "load_landsat8 maps a nested apply_scale_factors (SR_B. overwrite) over LANDSAT/LC08/C02/T1_L2 (rusle_utils.py:152-168, gee_service.py:139-154). calculate_c_factor takes a median composite and calls normalizedDifference([SR_B5, SR_B4]) on scaled SR (rusle_utils.py:443, rusle_calculator.py:332) for the C factor. gee_service.py is the context file (no target)."
+    },
+    {
+      "id": "inferes",
+      "group": "original-2026-09-22",
+      "role": "candidate",
+      "repo": "Critical-Infrastructure-Systems-Lab/InfeRes",
+      "commit": "5e148bb14af243ee6499579c7b7a87725ad9c41c",
+      "files": [
+        {
+          "path": "src/ndwi_processing.py",
+          "sha256": "97f4c63553615032c147345559b66ad819f3e5d1598db0e041c052e780850e4b",
+          "expected": [
+            {"code": "EWL203", "line": 52, "static_scope": "out", "scope_gap": "the scaling pipeline is in satellite_composite.py and imports these helpers (from ndwi_processing import ...); needs cross-module analysis. The scaling helper also uses select('SR_B.*'), which the specification deliberately does not recognise (§8.7)"},
+            {"code": "EWL203", "line": 76, "static_scope": "out", "scope_gap": "same as line 52"}
+          ]
+        },
+        {
+          "path": "src/satellite_composite.py",
+          "sha256": "800e1917261b841e8747b3170bc230c18e0becb4be75ea36dea6a053d90e677e",
+          "expected": []
+        }
+      ],
+      "sweep": {"include": ["**.py"]},
+      "human_review_note": "satellite_composite.py:38-65 maps apply_scale_factors (ndwi_processing.py:137-155, SR_B.* and ST_B.* overwrite), mask_clouds_LS and calculate_ndwi_* over LC09/LC08/LE07/LT05 C2 L2; calculate_ndwi_L8_L9 (ndwi_processing.py:52) and calculate_ndwi_L5_L7 (line 76) call normalizedDifference on scaled SR. The unmask(-2) that follows fills masked output after the fact; it does not prevent negative-input masking. NDWI feeds an Otsu water mask."
+    },
+    {
+      "id": "openet-core-landsat",
+      "group": "original-2026-09-22",
+      "role": "control",
+      "repo": "Open-ET/openet-core",
+      "commit": "ab923aa7daf56cb9bbb1fe01c4295a3a1fc380d7",
+      "files": [
+        {
+          "path": "openet/core/landsat.py",
+          "sha256": "2ce22a2d3e1aa9f1564dbf5f8a1a64064b194589d1889a1d185914ebcdce6624",
+          "expected": []
+        }
+      ],
+      "sweep": {"include": ["**.py"]},
+      "adjudicated_findings": [
+        {"path": "openet/core/utils.py", "code": "EWL401", "line": 678, "label": "false_positive", "note": "reduceRegion(**rr_params) where rr_params contains 'scale' (fixed in v0.2.1)"},
+        {"path": "openet/core/utils.py", "code": "EWL401", "line": 688, "label": "false_positive", "note": "same shape as line 678"}
+      ],
+      "human_review_note": "Expert reference. c02_l2_sr (lines 4-44) renames bands and applies the documented scale/offset list-wise; c02_sr_ndi clamps inputs with max(0) before normalizedDifference (line 96) with a comment explaining that normalizedDifference returns nodata for negative inputs. The negative-input choice is explicit, so no EWL203 is expected; no other targeted anti-pattern is present."
+    },
+    {
+      "id": "crop-analysis",
+      "group": "added-2026-09-28",
+      "role": "candidate",
+      "repo": "SylviaChebetEMTH/Crop-Analysis",
+      "commit": "bb0924a79c061263fbee3b53e0e0c90e92c9886f",
+      "files": [
+        {
+          "path": "backend/NDVI.py",
+          "sha256": "eec8c4a53c6750637b21c9d15227f3d3af1f2b4c271c1a3b1d108178375df99a",
+          "expected": [{"code": "EWL502", "line": 33, "static_scope": "in"}]
+        },
+        {
+          "path": "backend/app.py",
+          "sha256": "aab2e658552ac46bd06dbc1d0b028175979a68ddc81bd288e563f9a381ee7019",
+          "expected": []
+        }
+      ],
+      "sweep": {"include": ["**.py"], "exclude": ["backend/gee_env2/**"]},
+      "human_review_note": "NDVI.py filters COPERNICUS/S2_SR_HARMONIZED to 2022-01-01..2022-12-31 (lines 17-20) and cloud-masks with select('QA60').eq(0) (line 33). QA60 cloud polygons were not produced from 2022-01-25 until February 2024, so for most of that year the mask removes nothing: the interval overlaps, but is not contained by, the documented QA60 gap, which is exactly EWL502. app.py (negative control): Sentinel-2 indices are computed with band arithmetic, not Landsat normalizedDifference; every reduceRegion passes scale=30 (lines 261-264, 451-454, 574-577); QA60 is never used; dates come from the request or a loop, so nothing is expected. The repository also vendors a Python virtualenv (backend/gee_env2), excluded from the sweep."
+    },
+    {
+      "id": "openet-geesebal-ndvi",
+      "group": "added-2026-09-28",
+      "role": "candidate",
+      "repo": "Open-ET/openet-geesebal",
+      "commit": "809bc36d136998d8e9a14086063c2490acc43276",
+      "files": [
+        {
+          "path": "openet/geesebal/openet_landsat.py",
+          "sha256": "e0e86a1721ed2ef8971a58a654c5bb9577e1d48a09d2c8c092bdd42c2d521e87",
+          "expected": [
+            {"code": "EWL203", "line": 20, "static_scope": "out", "scope_gap": "bands are renamed to nir/red/green by select(list, list) with per-platform ee.Dictionary lookups and scaled with ee.Image.constant lists in openet_image.py:276-301; the normalizedDifference call is in another module. Band identity and scale state cannot be proven statically"},
+            {"code": "EWL203", "line": 97, "static_scope": "out", "scope_gap": "same as line 20"}
+          ]
+        },
+        {
+          "path": "openet/geesebal/openet_image.py",
+          "sha256": "d015eb7c23890e4f22f43de46fb22225ea56b40d8c2af2af2a35c2af0ba9ec09",
+          "expected": []
+        }
+      ],
+      "sweep": {"include": ["**.py"]},
+      "adjudicated_findings": [
+        {"path": "openet/geesebal/utils.py", "code": "EWL401", "line": 80, "label": "false_positive", "note": "reduceRegion(**rr_params) where rr_params contains 'scale' (fixed in v0.2.1)"},
+        {"path": "openet/geesebal/utils.py", "code": "EWL401", "line": 90, "label": "false_positive", "note": "same shape as line 80"}
+      ],
+      "human_review_note": "openet_image.py:276-301 applies the documented C2 L2 SR scale/offset to Landsat 4-9 SR bands renamed to standard names; openet_landsat.ndvi (line 20) and ndwi (line 97) call normalizedDifference on that scaled SR without clamping, then unmask(0), so pixels with a negative input silently become 0. Unlike openet-core (max(0) with an explanatory comment) the choice is not explicit. EWL203 semantics apply, but the shape is outside the static model, so the expected tool result is PASS and the case is reported as coverage-unresolved."
+    },
+    {
+      "id": "openet-ssebop",
+      "group": "added-2026-09-28",
+      "role": "control",
+      "repo": "Open-ET/openet-ssebop",
+      "commit": "f6a97a2731111b0d3bd8cf1b85a2dccc23ae4c1d",
+      "sweep": {"include": ["**.py"]},
+      "adjudicated_findings": [
+        {"path": "openet/ssebop/utils.py", "code": "EWL401", "line": 46, "label": "false_positive", "note": "reduceRegion(**rr_params) where rr_params contains 'scale' (fixed in v0.2.1)"},
+        {"path": "openet/ssebop/utils.py", "code": "EWL401", "line": 56, "label": "false_positive", "note": "same shape as line 46"}
+      ],
+      "human_review_note": "Expert model code. landsat.py clamps inputs with max(0) before normalizedDifference (lines 126, 172) with an explanatory comment; the only region reductions pass scale through a parameter dict."
+    },
+    {
+      "id": "openet-ptjpl",
+      "group": "added-2026-09-28",
+      "role": "control",
+      "repo": "Open-ET/openet-ptjpl",
+      "commit": "f62fe24446c16d79e8a9710767de7c06d795a7af",
+      "sweep": {"include": ["**.py"]},
+      "adjudicated_findings": [
+        {"path": "openet/ptjpl/utils.py", "code": "EWL401", "line": 44, "label": "false_positive", "note": "reduceRegion(**rr_params) where rr_params contains 'scale' (fixed in v0.2.1)"},
+        {"path": "openet/ptjpl/utils.py", "code": "EWL401", "line": 54, "label": "false_positive", "note": "same shape as line 44"}
+      ],
+      "human_review_note": "Expert model code. landsat.normalized_difference clamps inputs with max(0) before normalizedDifference (lines 247-248) with an explanatory comment."
+    },
+    {
+      "id": "openet-sims",
+      "group": "added-2026-09-28",
+      "role": "control",
+      "repo": "Open-ET/openet-sims",
+      "commit": "20914c03c62c202bd068e4e887f0ad269e641920",
+      "sweep": {"include": ["**.py"]},
+      "adjudicated_findings": [
+        {"path": "openet/sims/utils.py", "code": "EWL401", "line": 44, "label": "false_positive", "note": "reduceRegion(**rr_params) where rr_params contains 'scale' (fixed in v0.2.1)"},
+        {"path": "openet/sims/utils.py", "code": "EWL401", "line": 54, "label": "false_positive", "note": "same shape as line 44"}
+      ],
+      "human_review_note": "Expert model code. image.py clamps inputs with max(0) before normalizedDifference (lines 500-501) with an explanatory comment."
+    },
+    {
+      "id": "earthengine-community-python-samples",
+      "group": "added-2026-09-28",
+      "role": "sweep",
+      "repo": "google/earthengine-community",
+      "commit": "dfc91467c24f095eba140c33e7f2a66fd1264fee",
+      "sweep": {"include": ["samples/python/**.py"]},
+      "not_analyzable": [
+        {"path": "samples/python/guides/quickstart.py", "note": "contains an IPython '%pip install' line (line 64), so it is not valid Python; exit code 2 is the documented CLI contract"}
+      ],
+      "adjudicated_findings": [
+        {"path": "samples/python/apidocs/ee_featurecollection_flatten.py", "code": "EWL401", "line": 26, "label": "false_positive", "note": "reduceRegions(**{... 'scale': 5000 ...}) (fixed in v0.2.1)"},
+        {"path": "samples/python/apidocs/ee_image_clip.py", "code": "EWL401", "line": 44, "label": "true_positive", "note": "reduceRegion(reducer=..., geometry=...) with neither scale nor crsTransform"},
+        {"path": "samples/python/guides/features04.py", "code": "EWL401", "line": 166, "label": "true_positive", "note": "reduceRegions(sheds, ee.Reducer.mean()) with neither scale nor crsTransform"},
+        {"path": "samples/python/guides/reducers00_overview.py", "code": "EWL401", "line": 48, "label": "true_positive", "note": "reduceRegion(reducer=..., bestEffort=True) with neither scale nor crsTransform"},
+        {"path": "samples/python/apidocs/ee_image_normalizeddifference.py", "code": "EWL201", "line": 22, "label": "true_positive", "note": "normalizedDifference([SR_B5, SR_B4]) directly on an unscaled LANDSAT/LC08/C02/T1_L2 image (lines 16-22)"},
+        {"path": "samples/python/guides/image_collections085.py", "code": "EWL201", "line": 52, "label": "true_positive", "note": "add_quality_bands computes normalizedDifference on the raw input image before prep_sr_l8 scales it (lines 50-57)"},
+        {"path": "samples/python/guides/arrays06.py", "code": "EWL203", "line": 33, "label": "true_positive", "note": "normalizedDifference on correctly scaled SR (lines 29-33) without an explicit negative-input choice"}
+      ],
+      "human_review_note": "Blind sweep of Google's official Earth Engine Python API and Developer Guide samples. Every finding any linter version produced was read and labelled; documentation snippets are not expert analysis workflows, so they are a false-positive probe rather than a negative control."
+    }
+  ]
+}

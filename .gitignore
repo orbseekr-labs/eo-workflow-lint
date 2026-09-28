@@ -15,3 +15,7 @@ tests/fixtures/SIDE_EFFECT_MARKER
 .DS_Store
 .idea/
 .vscode/
+
+# Real-world benchmark cache (validation/run_benchmark.py); never commit
+# third-party source.
+validation/.cache/
