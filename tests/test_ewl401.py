@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from support import LC08_ASSET, analyze, codes
+from support import LC08_ASSET, analyze, codes, run_cli
 
 PREAMBLE = f'''import ee
 img = ee.Image("{LC08_ASSET}")
@@ -165,3 +165,10 @@ def test_without_unpacking_missing_scale_is_still_flagged() -> None:
         PREAMBLE + "stats = img.reduceRegion(reducer=ee.Reducer.first(), geometry=aoi)\n"
     )
     assert codes(report) == ["EWL401"]
+
+
+def test_explain_lists_argument_unpacking_as_a_non_trigger() -> None:
+    """`explain` must reflect SPECIFICATION v0.2.1 §10.5 (release gate §22.7)."""
+    exit_code, out, _ = run_cli(["explain", "EWL401"])
+    assert exit_code == 0
+    assert "*/** argument unpacking" in out

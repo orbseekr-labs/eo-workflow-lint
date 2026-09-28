@@ -202,6 +202,7 @@ RULES: tuple[RuleMeta, ...] = (
             "keyword crsTransform=<non-None expression>",
             "positional non-None scale (third positional argument)",
             "positional non-None crsTransform (fifth positional argument)",
+            "the call uses */** argument unpacking (absence of scale/crsTransform is unprovable)",
         ),
         message=(
             "Region reduction does not explicitly define scale or crsTransform. Earth Engine "
