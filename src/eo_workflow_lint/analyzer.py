@@ -882,6 +882,16 @@ class Analyzer:
 
         line, column = _pos(node)
         self._operation_checks.add(("region_reduction", line, column))
+
+        # SPECIFICATION v0.2.1 §10.5: with ``**mapping`` or ``*sequence`` argument
+        # unpacking, the absence of scale/crsTransform cannot be proven (§8.1),
+        # so EWL401 is not emitted. Observed in real code as
+        # ``reduceRegion(**{"reducer": ..., "scale": 30})``.
+        if any(kw.arg is None for kw in node.keywords) or any(
+            isinstance(arg, ast.Starred) for arg in node.args
+        ):
+            return
+
         self._record(
             scale_rules.check_region_reduction(
                 method, scale_explicit, crs_transform_explicit, line, column

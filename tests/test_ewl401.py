@@ -102,3 +102,66 @@ def summarise(image, region):
 """
     )
     assert codes(report) == ["EWL401"]
+
+
+# ---------------------------------------------------------------------------
+# v0.2.1 regression: argument unpacking (real-world benchmark false positive).
+#
+# Open-ET/openet-ssebop, openet-ptjpl, openet-sims and openet-geesebal build a
+# parameter dict containing 'scale' and call ``reduceRegion(**rr_params)``; the
+# official Earth Engine Python API samples use ``reduceRegions(**{...,
+# 'scale': 5000})``. v0.2.0 ignored ``**`` unpacking and reported EWL401 although
+# scale was supplied. When arguments are unpacked the analyzer cannot prove that
+# scale and crsTransform are absent, so per SPECIFICATION §8.1 / §10.5 EWL401
+# must not fire. Minimal shapes only; no third-party source is copied.
+# ---------------------------------------------------------------------------
+
+
+def test_dict_literal_unpacking_with_scale_is_not_flagged() -> None:
+    report = analyze(
+        PREAMBLE + "stats = img.reduceRegion(**{'reducer': ee.Reducer.first(), 'geometry': aoi,"
+        " 'scale': 30})\n"
+    )
+    assert codes(report) == []
+    assert report.coverage.supported_operation_check_count == 1
+
+
+def test_named_dict_unpacking_with_scale_is_not_flagged() -> None:
+    report = analyze(
+        PREAMBLE
+        + "def point_image_value(image, xy, scale=1):\n"
+        + "    rr_params = {\n"
+        + "        'reducer': ee.Reducer.first(),\n"
+        + "        'geometry': ee.Geometry.Point(xy),\n"
+        + "        'scale': scale,\n"
+        + "    }\n"
+        + "    return ee.Image(image).reduceRegion(**rr_params)\n"
+    )
+    assert codes(report) == []
+
+
+def test_reduce_regions_dict_unpacking_is_not_flagged() -> None:
+    report = analyze(
+        PREAMBLE + "out = img.reduceRegions(**{'collection': aoi, 'reducer': ee.Reducer.mean(),"
+        " 'scale': 5000, 'crs': 'EPSG:4326'})\n"
+    )
+    assert codes(report) == []
+
+
+def test_unresolvable_keyword_unpacking_is_not_flagged() -> None:
+    """Absence of scale cannot be proven through an opaque mapping (§8.1)."""
+    report = analyze(PREAMBLE + "stats = img.reduceRegion(reducer=ee.Reducer.mean(), **options)\n")
+    assert codes(report) == []
+
+
+def test_positional_unpacking_is_not_flagged() -> None:
+    report = analyze(PREAMBLE + "stats = img.reduceRegion(ee.Reducer.mean(), *rest)\n")
+    assert codes(report) == []
+
+
+def test_without_unpacking_missing_scale_is_still_flagged() -> None:
+    """Twin of the unpacking cases: the ordinary trigger is unchanged."""
+    report = analyze(
+        PREAMBLE + "stats = img.reduceRegion(reducer=ee.Reducer.first(), geometry=aoi)\n"
+    )
+    assert codes(report) == ["EWL401"]
